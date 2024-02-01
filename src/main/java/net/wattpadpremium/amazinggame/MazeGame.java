@@ -6,8 +6,6 @@ import java.awt.event.KeyEvent;
 import java.awt.event.KeyAdapter;
 import java.util.Random;
 import java.util.Stack;
-import java.util.Timer;
-import java.util.TimerTask;
 
 public class MazeGame extends JFrame {
     private int playerX, playerY;
@@ -55,7 +53,7 @@ public class MazeGame extends JFrame {
             }
         }
 
-        offScreenGraphics.setColor(Color.RED);
+        offScreenGraphics.setColor(GameStart.selectedColor);
         offScreenGraphics.fillOval((playerX - viewPortX) * cellSize, (playerY - viewPortY) * cellSize, cellSize, cellSize);
 
         offScreenGraphics.setColor(Color.GREEN);
@@ -169,23 +167,8 @@ public class MazeGame extends JFrame {
         }
     }
 
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> {
-            MazeGame mazeGame = new MazeGame();
-            mazeGame.setVisible(true);
 
-            Timer timer = new Timer();
-            timer.scheduleAtFixedRate(new TimerTask() {
-                @Override
-                public void run() {
-                    mazeGame.handleContinuousMovement();
-                    mazeGame.repaint();
-                }
-            }, 0, 50); // Adjust the interval as needed
-        });
-    }
-
-    private void handleContinuousMovement() {
+    public void handleContinuousMovement() {
         int dx = 0;
         int dy = 0;
 
