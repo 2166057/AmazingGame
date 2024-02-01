@@ -61,8 +61,13 @@ public class MazeGame extends JFrame {
         offScreenGraphics.setColor(Color.GREEN);
         offScreenGraphics.fillRect((goalX - viewPortX) * cellSize, (goalY - viewPortY) * cellSize, cellSize, cellSize);
 
-        offScreenGraphics.setColor(Color.BLUE);
-        offScreenGraphics.drawString("Score: " + GameStart.score, viewPortX*cellSize, viewPortY+cellSize+20);
+        int marginX = 5;
+        int marginY = 10;
+        offScreenGraphics.setColor(Color.gray);
+        offScreenGraphics.fillRect(marginX,cellSize+marginY,100,20);
+        offScreenGraphics.setColor(Color.green);
+        offScreenGraphics.drawRect(marginX,cellSize+marginY,100,20);
+        offScreenGraphics.drawString("Score: " + GameStart.score, cellSize+5, cellSize+25);
 
         g.drawImage(offScreenBuffer, 0, 0, this);
     }
