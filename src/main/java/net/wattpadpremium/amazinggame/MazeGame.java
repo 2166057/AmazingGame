@@ -53,11 +53,16 @@ public class MazeGame extends JFrame {
             }
         }
 
+
+
         offScreenGraphics.setColor(GameStart.selectedColor);
         offScreenGraphics.fillOval((playerX - viewPortX) * cellSize, (playerY - viewPortY) * cellSize, cellSize, cellSize);
 
         offScreenGraphics.setColor(Color.GREEN);
         offScreenGraphics.fillRect((goalX - viewPortX) * cellSize, (goalY - viewPortY) * cellSize, cellSize, cellSize);
+
+        offScreenGraphics.setColor(Color.BLUE);
+        offScreenGraphics.drawString("Score: " + GameStart.score, viewPortX*cellSize, viewPortY+cellSize+20);
 
         g.drawImage(offScreenBuffer, 0, 0, this);
     }
@@ -186,6 +191,7 @@ public class MazeGame extends JFrame {
                 playerY = newY;
 
                 if (playerX == goalX && playerY == goalY) {
+                    GameStart.score++;
                     mazeWidth += 2; // Increase the maze width
                     mazeHeight += 2; // Increase the maze height
                     generatePlayerAndGoalPositions();
