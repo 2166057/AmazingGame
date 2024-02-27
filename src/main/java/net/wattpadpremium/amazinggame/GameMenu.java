@@ -15,7 +15,6 @@ public class GameMenu extends JFrame {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(400, 300);
         setLocationRelativeTo(null);
-
         initComponents();
     }
 
@@ -28,6 +27,8 @@ public class GameMenu extends JFrame {
         JButton exitButton = new JButton("Exit");
 
         startButton.addActionListener(e -> {
+            GameStart.timeLeft = 60;
+            GameStart.score = 0;
             MazeGame mazeGame = new MazeGame();
             mazeGame.setVisible(true);
 
@@ -39,6 +40,8 @@ public class GameMenu extends JFrame {
                     mazeGame.repaint();
                 }
             }, 0, 50);
+
+
         });
 
         colorButton.addActionListener(new ActionListener() {

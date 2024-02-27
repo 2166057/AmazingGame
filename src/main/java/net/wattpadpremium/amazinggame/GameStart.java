@@ -4,9 +4,10 @@ import javax.swing.*;
 import java.awt.*;
 
 public class GameStart {
-
     public static Color selectedColor = new Color(231, 38, 116);
     public static int score = 0;
+    public static Integer timeLeft;
+    public static int best_score = 0;
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             new GameMenu().setVisible(true);

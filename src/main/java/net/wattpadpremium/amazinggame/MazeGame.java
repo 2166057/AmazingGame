@@ -6,8 +6,11 @@ import java.awt.event.KeyEvent;
 import java.awt.event.KeyAdapter;
 import java.util.Random;
 import java.util.Stack;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class MazeGame extends JFrame {
+    private Timer scoreTimer;
     private int playerX, playerY;
     private int goalX, goalY;
     private int mazeWidth = 15;
@@ -22,14 +25,28 @@ public class MazeGame extends JFrame {
     private boolean[] keyState = new boolean[4]; // 0: UP, 1: DOWN, 2: LEFT, 3: RIGHT
 
     public MazeGame() {
-        setTitle("Maze Game");
+        setTitle("Best Score: " + GameStart.best_score);
         setSize(viewPortWidth * cellSize, viewPortHeight * cellSize);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         setResizable(false);
         addKeyListener(new KeyHandler());
         setLayout(null);
-
+        scoreTimer = new Timer();
+        scoreTimer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                GameStart.timeLeft--;
+                if (GameStart.timeLeft == 0){
+                    cancel();
+                    if (GameStart.score > GameStart.best_score){
+                        GameStart.best_score = GameStart.score;
+                    }
+                    setVisible(false);
+                    dispose();
+                }
+            }
+        }, 0, 1000);
         generatePlayerAndGoalPositions();
     }
 
@@ -68,6 +85,12 @@ public class MazeGame extends JFrame {
         offScreenGraphics.setColor(Color.green);
         offScreenGraphics.drawRect(marginX,cellSize+marginY,100,20);
         offScreenGraphics.drawString("Score: " + GameStart.score, cellSize+5, cellSize+25);
+
+        offScreenGraphics.setColor(Color.gray);
+        offScreenGraphics.fillRect(marginX,cellSize+marginY+25,100,20);
+        offScreenGraphics.setColor(Color.blue);
+        offScreenGraphics.drawRect(marginX,cellSize+marginY+25,100,20);
+        offScreenGraphics.drawString("Time Left: " + GameStart.timeLeft, cellSize+5, cellSize+50);
 
         g.drawImage(offScreenBuffer, 0, 0, this);
     }
@@ -197,6 +220,7 @@ public class MazeGame extends JFrame {
 
                 if (playerX == goalX && playerY == goalY) {
                     GameStart.score++;
+                    GameStart.timeLeft = GameStart.timeLeft+10;
                     mazeWidth += 2; // Increase the maze width
                     mazeHeight += 2; // Increase the maze height
                     generatePlayerAndGoalPositions();
