@@ -80,17 +80,25 @@ public class MazeGame extends JFrame {
 
         int marginX = 5;
         int marginY = 10;
+
         offScreenGraphics.setColor(Color.gray);
         offScreenGraphics.fillRect(marginX,cellSize+marginY,100,20);
         offScreenGraphics.setColor(Color.green);
         offScreenGraphics.drawRect(marginX,cellSize+marginY,100,20);
-        offScreenGraphics.drawString("Score: " + GameStart.score, cellSize+5, cellSize+25);
+        offScreenGraphics.drawString("Best Score: " + GameStart.best_score, cellSize+5, cellSize+25);
+
 
         offScreenGraphics.setColor(Color.gray);
         offScreenGraphics.fillRect(marginX,cellSize+marginY+25,100,20);
-        offScreenGraphics.setColor(Color.blue);
+        offScreenGraphics.setColor(Color.green);
         offScreenGraphics.drawRect(marginX,cellSize+marginY+25,100,20);
-        offScreenGraphics.drawString("Time Left: " + GameStart.timeLeft, cellSize+5, cellSize+50);
+        offScreenGraphics.drawString("Score: " + GameStart.score, cellSize+5, cellSize+50);
+
+        offScreenGraphics.setColor(Color.gray);
+        offScreenGraphics.fillRect(marginX,cellSize+marginY+50,100,20);
+        offScreenGraphics.setColor(Color.blue);
+        offScreenGraphics.drawRect(marginX,cellSize+marginY+50,100,20);
+        offScreenGraphics.drawString("Time Left: " + GameStart.timeLeft, cellSize+5, cellSize+75);
 
         g.drawImage(offScreenBuffer, 0, 0, this);
     }
