@@ -23,6 +23,7 @@ public class GameMenu extends JFrame {
         mainPanel.setLayout(new GridLayout(3, 1));
 
         JButton startButton = new JButton("Start Game");
+        JButton multiPlayer = new JButton("Multiplayer");
         JButton colorButton = new JButton("Choose Player Color");
         JButton exitButton = new JButton("Exit");
 
@@ -32,7 +33,7 @@ public class GameMenu extends JFrame {
             MazeGame mazeGame = new MazeGame();
             mazeGame.setVisible(true);
 
-            java.util.Timer timer = new Timer();
+            Timer timer = new Timer();
             timer.scheduleAtFixedRate(new TimerTask() {
                 @Override
                 public void run() {
@@ -54,6 +55,7 @@ public class GameMenu extends JFrame {
         exitButton.addActionListener(e -> System.exit(0));
 
         mainPanel.add(startButton);
+        mainPanel.add(multiPlayer);
         mainPanel.add(colorButton);
         mainPanel.add(exitButton);
 
