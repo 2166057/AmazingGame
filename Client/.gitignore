@@ -1,0 +1,5 @@
+.idea
+
+# Ignore Maven/Gradle build output directory
+target/
+*/target/
