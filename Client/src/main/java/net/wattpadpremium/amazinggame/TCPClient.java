@@ -1,40 +1,61 @@
 package net.wattpadpremium.amazinggame;
 
-import java.io.*;
-import java.net.*;
+import lombok.Getter;
+import net.wattpadpremium.Packet;
+import net.wattpadpremium.PacketHandler;
+
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.Socket;
+import java.util.concurrent.CompletableFuture;
 
 public class TCPClient {
-    private static final String SERVER_ADDRESS = "localhost";
-    private static final int SERVER_PORT = 12345;
 
-    public void startClient() throws IOException {
-        Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT);
-        BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-        PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+    private final Socket socket;
+    @Getter
+    private final PacketHandler packetHandler;
 
-        // Create a BufferedReader to read user input from the console
-        BufferedReader userInput = new BufferedReader(new InputStreamReader(System.in));
 
-        System.out.println("Client connected to server. Type your messages:");
-
-        // Send and receive messages
-        String message;
-        while ((message = userInput.readLine()) != null) {
-            // Send message to the server
-            out.println(message);
-
-            // Receive server's response
-            String serverResponse = in.readLine();
-            System.out.println("Server says: " + serverResponse);
-        }
-
-        socket.close();
+    public TCPClient(String serverAddress, int port) throws IOException {
+        socket = new Socket(serverAddress, port);
+        this.packetHandler = new PacketHandler();
+        new Thread(this::listenForPackets).start();
     }
 
-    public static void main(String[] args) {
+    public void sendPacket(Packet packet) {
+        CompletableFuture.runAsync(()->{
+            try {
+                var out = new DataOutputStream(socket.getOutputStream());
+                out.writeInt(packet.getId());
+                packet.writeData(out);
+                System.out.println("Sending Packet: " + packet);
+                out.flush();
+            } catch (IOException e) {
+                System.err.println("Error sending packet: " + e.getMessage());
+            }
+        });
+    }
+
+    public void listenForPackets() {
         try {
-            TCPClient client = new TCPClient();
-            client.startClient();
+            while (true) {
+                // Read and handle incoming packets
+                try {
+                    packetHandler.handlePacket(new DataInputStream(socket.getInputStream()));
+                } catch (IOException e) {
+                    System.err.println("Error reading packet: " + e.getMessage());
+                    break;
+                }
+            }
+        } finally {
+            stopClient();
+        }
+    }
+
+    private void stopClient() {
+        try {
+            socket.close();
         } catch (IOException e) {
             e.printStackTrace();
         }

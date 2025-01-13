@@ -1,20 +1,22 @@
 package net.wattpadpremium.amazinggame;
 
+import net.wattpadpremium.MazePacket;
+import net.wattpadpremium.PositionChangePacket;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyAdapter;
-import java.util.Random;
-import java.util.Stack;
+import java.util.HashMap;
 import java.util.Timer;
 import java.util.TimerTask;
 
 public class MazeGame extends JFrame {
-    private Timer scoreTimer;
-    private int playerX, playerY;
-    private int goalX, goalY;
-    private int mazeWidth = 15;
-    private int mazeHeight = 15;
+    private final TCPClient tcpClient;
+    private int localPosX = 0, localPosY = 0;
+    private final HashMap<String, Player> otherPlayers = new HashMap<>();
+    private int goalX = 0, goalY = 0;
+    private int mazeSize = 15;
     private final int cellSize = 30;
     private int viewPortX = 0;  // X-coordinate of the top-left corner of the viewport
     private int viewPortY = 0;  // Y-coordinate of the top-left corner of the viewport
@@ -22,32 +24,33 @@ public class MazeGame extends JFrame {
     private final int viewPortHeight = 10; // Number of visible cells in height
     private int[][] maze;
 
-    private boolean[] keyState = new boolean[4]; // 0: UP, 1: DOWN, 2: LEFT, 3: RIGHT
+    private final boolean[] keyState = new boolean[5]; // 0: UP, 1: DOWN, 2: LEFT, 3: RIGHT, 4: TAB
 
-    public MazeGame() {
-        setTitle("Best Score: " + GameStart.best_score);
+    private final GameInstance gameInstance;
+    private int score = 0;
+
+    public MazeGame(TCPClient tcpClient, GameInstance gameInstance, MazePacket mazePacket) {
+        this.tcpClient = tcpClient;
+        updateMaze(mazePacket);
+        this.gameInstance = gameInstance;
         setSize(viewPortWidth * cellSize, viewPortHeight * cellSize);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         setResizable(false);
         addKeyListener(new KeyHandler());
         setLayout(null);
-        scoreTimer = new Timer();
-        scoreTimer.scheduleAtFixedRate(new TimerTask() {
+        setVisible(true);
+        localPosX = 0;
+        localPosY = 0;
+
+        java.util.Timer timer = new Timer();
+        timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
-                GameStart.timeLeft--;
-                if (GameStart.timeLeft == 0){
-                    cancel();
-                    if (GameStart.score > GameStart.best_score){
-                        GameStart.best_score = GameStart.score;
-                    }
-                    setVisible(false);
-                    dispose();
-                }
+                handleContinuousMovement();
+                repaint();
             }
-        }, 0, 1000);
-        generatePlayerAndGoalPositions();
+        }, 0, 50);
     }
 
     @Override
@@ -55,11 +58,12 @@ public class MazeGame extends JFrame {
         Image offScreenBuffer = createImage(getWidth(), getHeight());
         Graphics offScreenGraphics = offScreenBuffer.getGraphics();
 
+        //maze
         for (int x = 0; x < viewPortWidth; x++) {
             for (int y = 0; y < viewPortHeight; y++) {
                 int cellX = viewPortX + x;
                 int cellY = viewPortY + y;
-                if (cellX < 0 || cellX >= mazeWidth || cellY < 0 || cellY >= mazeHeight) {
+                if (cellX < 0 || cellX >= mazeSize || cellY < 0 || cellY >= mazeSize) {
                     offScreenGraphics.setColor(Color.BLACK);
                     offScreenGraphics.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
                 } else {
@@ -72,109 +76,91 @@ public class MazeGame extends JFrame {
 
 
 
-        offScreenGraphics.setColor(GameStart.selectedColor);
-        offScreenGraphics.fillOval((playerX - viewPortX) * cellSize, (playerY - viewPortY) * cellSize, cellSize, cellSize);
+        //self
+        offScreenGraphics.setColor(gameInstance.getProfile().getColor());
+        offScreenGraphics.fillOval((localPosX - viewPortX) * cellSize, (localPosY - viewPortY) * cellSize, cellSize, cellSize);
 
+
+        String bestPlayer = gameInstance.getProfile().getUsername();
+        int bestPlayerScore = score;
+        //server_players
+        for (Player player : otherPlayers.values()){
+            if (player.getScore() > bestPlayerScore){
+                bestPlayer = player.getUsername();
+                bestPlayerScore = player.getScore();
+            }
+            offScreenGraphics.setColor(player.getColor());
+            offScreenGraphics.fillOval((player.getX() - viewPortX) * cellSize, (player.getY() - viewPortY) * cellSize, cellSize, cellSize);
+        }
+
+        if (keyState[4]){
+            String bestPlayerDisplay = "#1 " + bestPlayer + " - " + bestPlayerScore;
+
+            offScreenGraphics.setColor(Color.LIGHT_GRAY);
+            int rectWidth = offScreenGraphics.getFontMetrics().stringWidth(bestPlayerDisplay) + 20; // Add padding
+            int rectHeight = offScreenGraphics.getFontMetrics().getAscent() + offScreenGraphics.getFontMetrics().getDescent() + 10; // Add padding
+            int rectX = 0;
+            int rectY = 30;
+            offScreenGraphics.fillRect(rectX, rectY, rectWidth, rectHeight);
+            offScreenGraphics.setColor(Color.BLACK);
+            int textX = rectX + 10;
+            int textY = rectY + (rectHeight - offScreenGraphics.getFontMetrics().getDescent());
+            offScreenGraphics.drawString(bestPlayerDisplay, textX, textY);
+        }
+
+        //goal
         offScreenGraphics.setColor(Color.GREEN);
         offScreenGraphics.fillRect((goalX - viewPortX) * cellSize, (goalY - viewPortY) * cellSize, cellSize, cellSize);
-
-        int marginX = 5;
-        int marginY = 10;
-
-        offScreenGraphics.setColor(Color.gray);
-        offScreenGraphics.fillRect(marginX,cellSize+marginY,100,20);
-        offScreenGraphics.setColor(Color.green);
-        offScreenGraphics.drawRect(marginX,cellSize+marginY,100,20);
-        offScreenGraphics.drawString("Best Score: " + GameStart.best_score, cellSize+5, cellSize+25);
-
-
-        offScreenGraphics.setColor(Color.gray);
-        offScreenGraphics.fillRect(marginX,cellSize+marginY+25,100,20);
-        offScreenGraphics.setColor(Color.green);
-        offScreenGraphics.drawRect(marginX,cellSize+marginY+25,100,20);
-        offScreenGraphics.drawString("Score: " + GameStart.score, cellSize+5, cellSize+50);
-
-        offScreenGraphics.setColor(Color.gray);
-        offScreenGraphics.fillRect(marginX,cellSize+marginY+50,100,20);
-        offScreenGraphics.setColor(Color.blue);
-        offScreenGraphics.drawRect(marginX,cellSize+marginY+50,100,20);
-        offScreenGraphics.drawString("Time Left: " + GameStart.timeLeft, cellSize+5, cellSize+75);
 
         g.drawImage(offScreenBuffer, 0, 0, this);
     }
 
-    private void generateMazeUsingRecursiveBacktracking() {
-        maze = new int[mazeHeight][mazeWidth]; // Create a new maze
+    public void setLocalePosition(int x, int y) {
+        localPosX = x;
+        localPosY = y;
+    }
 
-        for (int x = 0; x < mazeWidth; x++) {
-            for (int y = 0; y < mazeHeight; y++) {
-                maze[y][x] = 1;
-            }
-        }
-
-        Stack<Point> stack = new Stack<>();
-        Random random = new Random();
-
-        int startX = 2;
-        int startY = 2;
-        maze[startY][startX] = 0;
-
-        stack.push(new Point(startX, startY));
-
-        while (!stack.isEmpty()) {
-            Point current = stack.peek();
-            int x = current.x;
-            int y = current.y;
-
-            int[] dx = {2, 0, -2, 0};
-            int[] dy = {0, 2, 0, -2};
-
-            int[] randomOrder = {0, 1, 2, 3};
-            randomOrder = shuffle(randomOrder, random);
-
-            boolean deadEnd = true;
-            for (int i = 0; i < 4; i++) {
-                int r = randomOrder[i];
-                int newX = x + dx[r];
-                int newY = y + dy[r];
-
-                if (newX > 0 && newX < mazeWidth - 1 && newY > 0 && newY < mazeHeight - 1 && maze[newY][newX] == 1) {
-                    maze[newY][newX] = 0;
-                    maze[y + dy[r] / 2][x + dx[r] / 2] = 0;
-                    stack.push(new Point(newX, newY));
-                    deadEnd = false;
-                    break;
-                }
-            }
-
-            if (deadEnd) {
-                stack.pop();
-            }
+    public void setSpecificPlayerPos(String username, int x, int y) {
+        Player player = otherPlayers.get(username);
+        if (player != null){
+            player.setX(x);
+            player.setY(y);
+        }else {
+            Player newPlayer = new Player() ;
+            newPlayer.setUsername(username);
+            newPlayer.setX(x);
+            newPlayer.setY(y);
+            otherPlayers.putIfAbsent(username, newPlayer);
         }
     }
 
-    private int[] shuffle(int[] array, Random random) {
-        for (int i = array.length - 1; i > 0; i--) {
-            int index = random.nextInt(i + 1);
-            int temp = array[i];
-            array[i] = array[index];
-            array[index] = temp;
+    public void changeSpecificPlayerColor(String username, int color) {
+        Player player = otherPlayers.get(username);
+        if (player != null){
+            player.setColor(new Color(color));
+        }else {
+            Player newPlayer = new Player() ;
+            newPlayer.setUsername(username);
+            newPlayer.setColor(new Color(color));
+            otherPlayers.putIfAbsent(username, newPlayer);
         }
-        return array;
     }
 
-    private void generatePlayerAndGoalPositions() {
-        Random random = new Random();
-        generateMazeUsingRecursiveBacktracking();
-        while (true) {
-            playerX = random.nextInt(mazeWidth);
-            playerY = random.nextInt(mazeHeight);
-            goalX = random.nextInt(mazeWidth);
-            goalY = random.nextInt(mazeHeight);
+    public void updateMaze(MazePacket mazePacket) {
+        this.maze = mazePacket.getMaze();
+        this.mazeSize = mazePacket.getMaze().length;
+        this.goalX = mazePacket.getGoalX();
+        this.goalY = mazePacket.getGoalY();
+    }
 
-            if (maze[playerY][playerX] == 0 && maze[goalY][goalX] == 0) {
-                break;
-            }
+    public void setMyScore(int score) {
+        this.score = score;
+    }
+
+    public void changeSpecificPlayerScore(String username, int score) {
+        Player player = otherPlayers.get(username);
+        if (player != null){
+            player.setScore(score);
         }
     }
 
@@ -190,6 +176,8 @@ public class MazeGame extends JFrame {
                 keyState[2] = true;
             } else if (keyCode == KeyEvent.VK_RIGHT) {
                 keyState[3] = true;
+            } else if (keyCode == KeyEvent.VK_TAB) {
+                keyState[4] = true;
             }
         }
 
@@ -204,6 +192,8 @@ public class MazeGame extends JFrame {
                 keyState[2] = false;
             } else if (keyCode == KeyEvent.VK_RIGHT) {
                 keyState[3] = false;
+            } else if (keyCode == KeyEvent.VK_TAB){
+                keyState[4] = false;
             }
         }
     }
@@ -219,33 +209,34 @@ public class MazeGame extends JFrame {
         if (keyState[3]) dx = 1;
 
         if (dx != 0 || dy != 0) {
-            int newX = playerX + dx;
-            int newY = playerY + dy;
+            int newX = localPosX + dx;
+            int newY = localPosY + dy;
 
-            if (newX >= 0 && newX < mazeWidth && newY >= 0 && newY < mazeHeight && maze[newY][newX] != 1) {
-                playerX = newX;
-                playerY = newY;
+            if (newX >= 0 && newX < mazeSize && newY >= 0 && newY < mazeSize && maze[newY][newX] != 1) {
+                setLocalePosition(newX, newY);
 
-                if (playerX == goalX && playerY == goalY) {
-                    GameStart.score++;
-                    GameStart.timeLeft = GameStart.timeLeft+10;
-                    mazeWidth += 2; // Increase the maze width
-                    mazeHeight += 2; // Increase the maze height
-                    generatePlayerAndGoalPositions();
+                sendPositionChanges();
+
+                if (localPosX - viewPortX < 2) {
+                    viewPortX = Math.max(localPosX - 2, 0);
+                } else if (localPosX - viewPortX > viewPortWidth - 3) {
+                    viewPortX = Math.min(localPosX - viewPortWidth + 3, mazeSize - viewPortWidth);
                 }
-
-                // Implement scrolling
-                if (playerX - viewPortX < 2) {
-                    viewPortX = Math.max(playerX - 2, 0);
-                } else if (playerX - viewPortX > viewPortWidth - 3) {
-                    viewPortX = Math.min(playerX - viewPortWidth + 3, mazeWidth - viewPortWidth);
-                }
-                if (playerY - viewPortY < 2) {
-                    viewPortY = Math.max(playerY - 2, 0);
-                } else if (playerY - viewPortY > viewPortHeight - 3) {
-                    viewPortY = Math.min(playerY - viewPortHeight + 3, mazeHeight - viewPortHeight);
+                if (localPosY - viewPortY < 2) {
+                    viewPortY = Math.max(localPosY - 2, 0);
+                } else if (localPosY - viewPortY > viewPortHeight - 3) {
+                    viewPortY = Math.min(localPosY - viewPortHeight + 3, mazeSize - viewPortHeight);
                 }
             }
         }
+    }
+
+    private void sendPositionChanges() {
+        PositionChangePacket packet = new PositionChangePacket();
+        packet.setUsername(gameInstance.getProfile().getUsername());
+        packet.setColor(gameInstance.getProfile().getColor().getRGB());
+        packet.setY(localPosY);
+        packet.setX(localPosX);
+        tcpClient.sendPacket(packet);
     }
 }

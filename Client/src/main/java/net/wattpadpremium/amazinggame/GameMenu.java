@@ -10,7 +10,10 @@ import java.util.Timer;
 public class GameMenu extends JFrame {
     private JPanel mainPanel;
 
-    public GameMenu() {
+    private final GameInstance gameInstance;
+
+    public GameMenu(GameInstance gameInstance) {
+        this.gameInstance = gameInstance;
         setTitle("Game Menu");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(400, 300);
@@ -22,28 +25,9 @@ public class GameMenu extends JFrame {
         mainPanel = new JPanel();
         mainPanel.setLayout(new GridLayout(3, 1));
 
-        JButton startButton = new JButton("Start Game");
         JButton multiPlayerButton = new JButton("Multiplayer");
         JButton colorButton = new JButton("Choose Player Color");
         JButton exitButton = new JButton("Exit");
-
-        startButton.addActionListener(e -> {
-            GameStart.timeLeft = 60;
-            GameStart.score = 0;
-            MazeGame mazeGame = new MazeGame();
-            mazeGame.setVisible(true);
-
-            Timer timer = new Timer();
-            timer.scheduleAtFixedRate(new TimerTask() {
-                @Override
-                public void run() {
-                    mazeGame.handleContinuousMovement();
-                    mazeGame.repaint();
-                }
-            }, 0, 50);
-
-
-        });
 
         colorButton.addActionListener(new ActionListener() {
             @Override
@@ -54,10 +38,8 @@ public class GameMenu extends JFrame {
 
         exitButton.addActionListener(e -> System.exit(0));
 
-        multiPlayerButton.addActionListener(e -> new MultiplayerMenu(this).setVisible(true));
-        
+        multiPlayerButton.addActionListener(e -> new MultiplayerMenu(gameInstance,this).setVisible(true));
 
-        mainPanel.add(startButton);
         mainPanel.add(multiPlayerButton);
         mainPanel.add(colorButton);
         mainPanel.add(exitButton);
@@ -66,12 +48,8 @@ public class GameMenu extends JFrame {
     }
 
     private void showColorSelector() {
-        ColorSelector colorSelector = new ColorSelector(this, GameStart.selectedColor);
-        GameStart.selectedColor = colorSelector.getSelectedColor();
-        mainPanel.setBackground(GameStart.selectedColor);
-    }
-
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new GameMenu().setVisible(true));
+        ColorSelector colorSelector = new ColorSelector(this, gameInstance.getProfile().getColor());
+        gameInstance.getProfile().setColor(colorSelector.getSelectedColor());
+        mainPanel.setBackground(gameInstance.getProfile().getColor());
     }
 }

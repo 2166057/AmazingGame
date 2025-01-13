@@ -1,27 +1,33 @@
+package net.wattpadpremium;
+
+import lombok.Getter;
+
 import java.io.*;
 import java.net.*;
 import java.util.*;
 
 public class TCPServer {
+
     private static final int SERVER_PORT = 12345;
-    private ServerSocket serverSocket;
-    private List<ClientHandler> clientHandlers;
+    private final ServerSocket serverSocket;
+    private final List<ClientHandler> clientHandlers = new ArrayList<>();
+
+    @Getter
+    private final PacketHandler packetHandler;
 
     public TCPServer() throws IOException {
         serverSocket = new ServerSocket(SERVER_PORT);
-        clientHandlers = new ArrayList<>();
+        packetHandler = new PacketHandler();
     }
 
-    // Method to handle client communication
     public void startServer() {
+        System.out.println("Server started on port " + SERVER_PORT);
         try {
-            System.out.println("Server started, waiting for clients...");
             while (true) {
-                Socket clientSocket = serverSocket.accept(); // Accept a new client connection
+                Socket clientSocket = serverSocket.accept();
                 System.out.println("Client connected: " + clientSocket.getInetAddress());
 
-                // Create a new ClientHandler thread for each client
-                ClientHandler clientHandler = new ClientHandler(clientSocket);
+                ClientHandler clientHandler = new ClientHandler(clientSocket, this);
                 clientHandlers.add(clientHandler);
                 new Thread(clientHandler).start();
             }
@@ -30,70 +36,56 @@ public class TCPServer {
         }
     }
 
-    // Broadcast message to all connected clients
-    public void broadcastMessage(String message) {
+    public void broadcastPacket(Packet packet) {
         for (ClientHandler clientHandler : clientHandlers) {
-            clientHandler.sendMessage(message);
+            clientHandler.sendPacket(packet);
         }
     }
 
-    public static void main(String[] args) {
-        try {
-            TCPServer server = new TCPServer();
-            server.startServer();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
 
-    // Inner class to handle communication with each client
-    private static class ClientHandler implements Runnable {
-        private Socket clientSocket;
-        private BufferedReader in;
-        private PrintWriter out;
-        
-        public ClientHandler(Socket socket) {
+    private class ClientHandler implements Runnable {
+        private final Socket clientSocket;
+        private final TCPServer tcpServer;
+
+        public ClientHandler(Socket socket, TCPServer tcpServer) {
             this.clientSocket = socket;
+            this.tcpServer = tcpServer;
         }
 
         @Override
         public void run() {
             try {
-                // Set up input and output streams for the client
-                in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-                out = new PrintWriter(clientSocket.getOutputStream(), true);
-
-                String clientMessage;
-                while ((clientMessage = in.readLine()) != null) {
-                    System.out.println("Received from client: " + clientMessage);
-
-                    // Echo the received message back to the client
-                    out.println("Server received: " + clientMessage);
-
-                    // Broadcast the message to all connected clients
-                    broadcastMessageToAll("Client says: " + clientMessage);
+                DataInputStream in = new DataInputStream(clientSocket.getInputStream());
+                while (true) {
+                    try {
+                        tcpServer.packetHandler.handlePacket(in);
+                    } catch (IOException e) {
+                        System.err.println("Error reading packet: " + e.getMessage());
+                        break;
+                    }
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                System.err.println("Client connection error: " + e.getMessage());
             } finally {
                 try {
                     clientSocket.close();
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
+                tcpServer.clientHandlers.remove(this);
+                System.out.println("Client disconnected: " + clientSocket.getInetAddress());
             }
         }
 
-        // Send a message to this specific client
-        public void sendMessage(String message) {
-            out.println(message);
-        }
-
-        // Broadcast message to all clients
-        public static void broadcastMessageToAll(String message) {
-            // Send message to all clients
-            for (ClientHandler handler : clientHandlers) {
-                handler.sendMessage(message);
+        public void sendPacket(Packet packet) {
+            try {
+                DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream());
+                out.writeInt(packet.getId());
+                packet.writeData(out);
+                System.out.println("Sending Packet: " + packet);
+                out.flush();
+            } catch (IOException e) {
+                System.err.println("Error sending packet: " + e.getMessage());
             }
         }
     }

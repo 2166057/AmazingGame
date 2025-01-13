@@ -7,7 +7,7 @@ import java.awt.event.ActionListener;
 
 public class ColorSelector extends JDialog {
     private Color selectedColor;
-    private JColorChooser colorChooser;
+    private final JColorChooser colorChooser;
 
     public ColorSelector(JFrame parent, Color initialColor) {
         super(parent, "Choose Color", true);
