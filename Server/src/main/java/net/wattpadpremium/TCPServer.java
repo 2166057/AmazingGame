@@ -1,6 +1,10 @@
 package net.wattpadpremium;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.Setter;
+import net.wattpadpremium.handler.ServerPacketHandler;
+import net.wattpadpremium.handler.ServerPacketListener;
 
 import java.io.*;
 import java.net.*;
@@ -13,11 +17,11 @@ public class TCPServer {
     private final List<ClientHandler> clientHandlers = new ArrayList<>();
 
     @Getter
-    private final PacketHandler packetHandler;
+    private final ServerPacketHandler serverPacketHandler;
 
     public TCPServer() throws IOException {
         serverSocket = new ServerSocket(SERVER_PORT);
-        packetHandler = new PacketHandler();
+        serverPacketHandler = new ServerPacketHandler();
     }
 
     public void startServer() {
@@ -42,10 +46,13 @@ public class TCPServer {
         }
     }
 
-
-    private class ClientHandler implements Runnable {
+    public static class ClientHandler implements Runnable {
         private final Socket clientSocket;
         private final TCPServer tcpServer;
+
+        @Setter
+        @Getter
+        private ServerPlayer serverPlayer;
 
         public ClientHandler(Socket socket, TCPServer tcpServer) {
             this.clientSocket = socket;
@@ -58,7 +65,7 @@ public class TCPServer {
                 DataInputStream in = new DataInputStream(clientSocket.getInputStream());
                 while (true) {
                     try {
-                        tcpServer.packetHandler.handlePacket(in);
+                        tcpServer.serverPacketHandler.handlePacket(in, this);
                     } catch (IOException e) {
                         System.err.println("Error reading packet: " + e.getMessage());
                         break;
@@ -73,6 +80,9 @@ public class TCPServer {
                     e.printStackTrace();
                 }
                 tcpServer.clientHandlers.remove(this);
+                if (getServerPlayer() != null){
+                    getServerPlayer().onDisconnect();
+                }
                 System.out.println("Client disconnected: " + clientSocket.getInetAddress());
             }
         }
@@ -88,5 +98,6 @@ public class TCPServer {
                 System.err.println("Error sending packet: " + e.getMessage());
             }
         }
+
     }
 }

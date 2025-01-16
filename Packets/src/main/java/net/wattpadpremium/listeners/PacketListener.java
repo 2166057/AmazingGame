@@ -1,4 +1,6 @@
-package net.wattpadpremium;
+package net.wattpadpremium.listeners;
+
+import net.wattpadpremium.Packet;
 
 public interface PacketListener {
 

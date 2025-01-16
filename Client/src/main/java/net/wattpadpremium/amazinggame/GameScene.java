@@ -7,11 +7,15 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyAdapter;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.HashMap;
 import java.util.Timer;
 import java.util.TimerTask;
 
-public class MazeGame extends JFrame {
+public class GameScene extends JFrame {
     private final TCPClient tcpClient;
     private int localPosX = 0, localPosY = 0;
     private final HashMap<String, Player> otherPlayers = new HashMap<>();
@@ -24,27 +28,35 @@ public class MazeGame extends JFrame {
     private final int viewPortHeight = 10; // Number of visible cells in height
     private int[][] maze;
 
+    java.util.Timer ticking;
+
     private final boolean[] keyState = new boolean[5]; // 0: UP, 1: DOWN, 2: LEFT, 3: RIGHT, 4: TAB
 
     private final GameInstance gameInstance;
     private int score = 0;
 
-    public MazeGame(TCPClient tcpClient, GameInstance gameInstance, MazePacket mazePacket) {
+    public GameScene(TCPClient tcpClient, GameInstance gameInstance, MazePacket mazePacket) {
         this.tcpClient = tcpClient;
-        updateMaze(mazePacket);
         this.gameInstance = gameInstance;
+
+        setFocusTraversalKeysEnabled(false);
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                tcpClient.stopClient();
+            }
+        });
+
+        updateMaze(mazePacket);
         setSize(viewPortWidth * cellSize, viewPortHeight * cellSize);
-        setDefaultCloseOperation(EXIT_ON_CLOSE);
-        setLocationRelativeTo(null);
         setResizable(false);
         addKeyListener(new KeyHandler());
-        setLayout(null);
         setVisible(true);
         localPosX = 0;
         localPosY = 0;
 
-        java.util.Timer timer = new Timer();
-        timer.scheduleAtFixedRate(new TimerTask() {
+        ticking = new Timer();
+        ticking.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
                 handleContinuousMovement();
@@ -74,43 +86,65 @@ public class MazeGame extends JFrame {
             }
         }
 
-
-
         //self
         offScreenGraphics.setColor(gameInstance.getProfile().getColor());
         offScreenGraphics.fillOval((localPosX - viewPortX) * cellSize, (localPosY - viewPortY) * cellSize, cellSize, cellSize);
 
-
-        String bestPlayer = gameInstance.getProfile().getUsername();
-        int bestPlayerScore = score;
         //server_players
         for (Player player : otherPlayers.values()){
-            if (player.getScore() > bestPlayerScore){
-                bestPlayer = player.getUsername();
-                bestPlayerScore = player.getScore();
-            }
             offScreenGraphics.setColor(player.getColor());
             offScreenGraphics.fillOval((player.getX() - viewPortX) * cellSize, (player.getY() - viewPortY) * cellSize, cellSize, cellSize);
-        }
-
-        if (keyState[4]){
-            String bestPlayerDisplay = "#1 " + bestPlayer + " - " + bestPlayerScore;
-
-            offScreenGraphics.setColor(Color.LIGHT_GRAY);
-            int rectWidth = offScreenGraphics.getFontMetrics().stringWidth(bestPlayerDisplay) + 20; // Add padding
-            int rectHeight = offScreenGraphics.getFontMetrics().getAscent() + offScreenGraphics.getFontMetrics().getDescent() + 10; // Add padding
-            int rectX = 0;
-            int rectY = 30;
-            offScreenGraphics.fillRect(rectX, rectY, rectWidth, rectHeight);
-            offScreenGraphics.setColor(Color.BLACK);
-            int textX = rectX + 10;
-            int textY = rectY + (rectHeight - offScreenGraphics.getFontMetrics().getDescent());
-            offScreenGraphics.drawString(bestPlayerDisplay, textX, textY);
+            offScreenGraphics.setColor(Color.GRAY);
+            offScreenGraphics.drawString(player.getUsername(),(player.getX() - viewPortX) * cellSize, (player.getY() - viewPortY) * cellSize);
         }
 
         //goal
         offScreenGraphics.setColor(Color.GREEN);
         offScreenGraphics.fillRect((goalX - viewPortX) * cellSize, (goalY - viewPortY) * cellSize, cellSize, cellSize);
+
+        if (keyState[4]) {
+            int canvasWidth = getWidth();
+            int canvasHeight = getHeight();
+
+            if (canvasWidth <= 0 || canvasHeight <= 0) {
+                return;
+            }
+
+            List<Player> copy = new ArrayList<>(otherPlayers.values());
+
+            Player localPlayer = new Player();
+            localPlayer.setUsername(gameInstance.getProfile().getUsername());
+            localPlayer.setScore(score);
+            copy.add(localPlayer);
+
+            copy.sort((p1, p2) -> Integer.compare(p2.getScore(), p1.getScore()));
+
+            int rectWidth = 200;
+            int rectHeight = 150;
+
+            int rectX = (canvasWidth - rectWidth) / 2;
+            int rectY = (canvasHeight - rectHeight) / 2;
+
+            offScreenGraphics.setColor(Color.LIGHT_GRAY);
+            offScreenGraphics.fillRect(rectX, rectY, rectWidth, rectHeight);
+
+            offScreenGraphics.setColor(Color.BLACK);
+            int lineHeight = offScreenGraphics.getFontMetrics().getHeight();
+            int textX = rectX + 10;
+            int textY = rectY + lineHeight;
+
+            for (int i = 0; i < Math.min(3, copy.size()); i++) {
+                Player player = copy.get(i);
+                String playerDisplay = "#" + (i + 1) + " " + player.getUsername() + " - " + player.getScore();
+                offScreenGraphics.drawString(playerDisplay, textX, textY);
+                textY += lineHeight;
+            }
+
+            String localPlayerDisplay = "Your Score: " + score;
+            offScreenGraphics.drawString(localPlayerDisplay, textX, textY);
+        }
+
+
 
         g.drawImage(offScreenBuffer, 0, 0, this);
     }
@@ -238,5 +272,11 @@ public class MazeGame extends JFrame {
         packet.setY(localPosY);
         packet.setX(localPosX);
         tcpClient.sendPacket(packet);
+    }
+
+    public void endGame(){
+        ticking.cancel();
+        this.setVisible(false);
+        this.dispose();
     }
 }

@@ -26,7 +26,7 @@ public class TCPClient {
     public void sendPacket(Packet packet) {
         CompletableFuture.runAsync(()->{
             try {
-                var out = new DataOutputStream(socket.getOutputStream());
+                DataOutputStream out = new DataOutputStream(socket.getOutputStream());
                 out.writeInt(packet.getId());
                 packet.writeData(out);
                 System.out.println("Sending Packet: " + packet);
@@ -40,7 +40,6 @@ public class TCPClient {
     public void listenForPackets() {
         try {
             while (true) {
-                // Read and handle incoming packets
                 try {
                     packetHandler.handlePacket(new DataInputStream(socket.getInputStream()));
                 } catch (IOException e) {
@@ -53,11 +52,12 @@ public class TCPClient {
         }
     }
 
-    private void stopClient() {
+    public void stopClient() {
         try {
             socket.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
+
 }

@@ -1,22 +1,24 @@
-package net.wattpadpremium;
+package net.wattpadpremium.handler;
 
-import net.wattpadpremium.listeners.PacketListener;
+import net.wattpadpremium.*;
 
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.HashMap;
 
-public class PacketHandler extends HashMap<Integer, PacketListener> {
+public class ServerPacketHandler extends HashMap<Integer, ServerPacketListener> {
 
-    public void handlePacket(DataInputStream input) throws IOException {
+    public void handlePacket(DataInputStream input, TCPServer.ClientHandler clientHandler) throws IOException {
         int packetId = input.readInt();
 
         Packet packet = Packet.createPacket(packetId, input);
         if (packet != null && containsKey(packetId)) {
-            get(packetId).handlePacket(packet);
+            get(packetId).handlePacket(packet, clientHandler);
         } else {
             System.err.println("Unknown packet ID: " + packetId);
         }
     }
+
+
 
 }

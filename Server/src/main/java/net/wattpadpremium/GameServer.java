@@ -7,10 +7,9 @@ import java.util.*;
 public class GameServer {
 
     public final TCPServer tcpServer;
-    private int spawnX, spawnY;
     private int goalX, goalY;
     private int mazeWidth = 15, mazeHeight = 15;
-    private final HashMap<String , ServerPlayer> players = new HashMap<>();
+    private final HashMap<String , ServerPlayer> allPlayers = new HashMap<>();
     private int[][] maze;
     private final int maxPlayerCount = 2;
 
@@ -18,35 +17,40 @@ public class GameServer {
 
     public GameServer() throws IOException {
         tcpServer = new TCPServer();
-        tcpServer.getPacketHandler().put(JoinPacket.ID, packet -> {
+        tcpServer.getServerPacketHandler().put(JoinPacket.ID, (packet, clientHandler) -> {
             if (matchStarted){
                 return;
             }
             JoinPacket joinPacket = (JoinPacket) packet;
-            ServerPlayer joiningPlayer = new ServerPlayer(joinPacket.getUsername(), joinPacket.getColor());
-            players.putIfAbsent(joinPacket.getUsername(), joiningPlayer);
-            System.out.println("Player " + joinPacket.getUsername() +  " has joined the game " + players.size() + "/" + maxPlayerCount);
-            if (players.size() == maxPlayerCount){
-                matchStarted = true;
-                generateMap();
-                broadcastMaze();
-                sendPlayerPositions();
+            if (joinPacket.getUsername().length() > 16){
+                return;
             }
+            ServerPlayer serverPlayer = new ServerPlayer(this, clientHandler, joinPacket.getUsername(), joinPacket.getColor());
+            System.out.println("Player " + joinPacket.getUsername() +  " has joined the game " + allPlayers.size() + "/" + maxPlayerCount);
+            if (allPlayers.size() == maxPlayerCount){
+                startGame();
+            }
+            allPlayers.forEach((string, player) -> {
+                PlayerCountPacket playerCountPacket = new PlayerCountPacket();
+                playerCountPacket.setCount(allPlayers.size());
+                playerCountPacket.setMax(maxPlayerCount);
+                player.sendPacket(playerCountPacket);
+            });
         });
-        tcpServer.getPacketHandler().put(PositionChangePacket.ID, packet -> {
+        tcpServer.getServerPacketHandler().put(PositionChangePacket.ID, (packet, clientHandler) -> {
+            ServerPlayer serverPlayer = clientHandler.getServerPlayer();
             PositionChangePacket positionChangePacket = (PositionChangePacket) packet;
-            ServerPlayer player = players.get(positionChangePacket.getUsername());
-            if (player != null) {
-                player.setX(positionChangePacket.getX());
-                player.setY(positionChangePacket.getY());
-                player.setColor(positionChangePacket.getColor());
+            if (serverPlayer != null) {
+                serverPlayer.setX(positionChangePacket.getX());
+                serverPlayer.setY(positionChangePacket.getY());
+                serverPlayer.setColor(positionChangePacket.getColor());
             }else {
                 return;
             }
             System.out.println(positionChangePacket.getUsername() + " moved to " +positionChangePacket.getX() + " _ " + positionChangePacket.getY());
 
-            for (ServerPlayer serverPlayer : players.values()){
-                if (serverPlayer.getX() == goalX && serverPlayer.getY() == goalY) {
+            for (ServerPlayer player : allPlayers.values()){
+                if (player.getX() == goalX && player.getY() == goalY) {
                     serverPlayer.setScore(serverPlayer.getScore()+1);
                     mazeWidth += 2;
                     mazeHeight += 2;
@@ -56,9 +60,7 @@ public class GameServer {
                     break;
                 }
             }
-
             sendPlayerPositions();
-
         });
         tcpServer.startServer();
     }
@@ -69,7 +71,7 @@ public class GameServer {
     }
 
     private void sendPlayerPositions() {
-        for (ServerPlayer player : players.values()){
+        for (ServerPlayer player : allPlayers.values()){
             PositionChangePacket positionChangePacket = new PositionChangePacket();
             positionChangePacket.setUsername(player.getUsername());
             positionChangePacket.setX(player.getX());
@@ -96,17 +98,17 @@ public class GameServer {
         Random random = new Random();
         generateMazeUsingRecursiveBacktracking();
 
+        int spawnX;
+        int spawnY;
         do {
             spawnX = random.nextInt(mazeWidth);
             spawnY = random.nextInt(mazeHeight);
-
-
             goalX = random.nextInt(mazeWidth);
             goalY = random.nextInt(mazeHeight);
 
         } while (maze[spawnY][spawnX] != 0 || maze[goalY][goalX] != 0);
 
-        for (ServerPlayer player : players.values()){
+        for (ServerPlayer player : allPlayers.values()){
             player.setX(spawnX);
             player.setY(spawnY);
         }
@@ -170,5 +172,29 @@ public class GameServer {
             array[index] = temp;
         }
         return array;
+    }
+
+    public void playerJoinEvent(ServerPlayer serverPlayer) {
+        allPlayers.put(serverPlayer.getUsername(), serverPlayer);
+    }
+
+    public void playerQuitEvent(ServerPlayer serverPlayer){
+        allPlayers.remove(serverPlayer.getUsername());
+        //TODO send player remove packet
+        if (allPlayers.size() != maxPlayerCount){
+            endGame();
+        }
+    }
+
+    private void startGame(){
+        matchStarted = true;
+        generateMap();
+        broadcastMaze();
+        sendPlayerPositions();
+    }
+
+    private void endGame() {
+        matchStarted = false;
+        tcpServer.broadcastPacket(new EndGamePacket());
     }
 }

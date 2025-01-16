@@ -45,17 +45,13 @@ public class GameLauncher extends JFrame {
                 } else {
                     profile.setUsername(username);
                     new GameInstance(profile);
-                    dispose(); // Close the launcher window
+                    dispose();
                 }
             }
         });
     }
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> {
-            GameLauncher launcher = new GameLauncher();
-            launcher.setVisible(true);
-        });
         SwingUtilities.invokeLater(() -> {
             GameLauncher launcher = new GameLauncher();
             launcher.setVisible(true);

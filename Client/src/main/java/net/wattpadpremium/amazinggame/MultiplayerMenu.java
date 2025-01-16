@@ -17,30 +17,29 @@ public class MultiplayerMenu extends JFrame {
 
     private TCPClient tcpClient;
 
-    private JTextField serverAddressField;
-    private JTextField portField;
-    private JButton connectButton;
+    private final JTextField serverAddressField;
+    private final JTextField portField;
+
+    private final JLabel playerLabel = new JLabel("");
 
     public MultiplayerMenu(GameInstance gameInstance,GameMenu gameMenu) {
         gameMenu.setVisible(false);
-        // Set up the frame
         setTitle("Multiplayer Menu");
         setSize(400, 200);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setLocationRelativeTo(null);  // Center the frame on the screen
+        setLocationRelativeTo(null);
         setLayout(new FlowLayout());
 
-        // Create and add components
         JLabel serverLabel = new JLabel("Server Address:");
-        serverAddressField = new JTextField(20);  // 20 columns wide
+        serverAddressField = new JTextField(20);
         serverAddressField.setText("127.0.0.1");
 
 
         JLabel portLabel = new JLabel("Port:");
-        portField = new JTextField(20);  // 20 columns wide
+        portField = new JTextField(20);
         portField.setText("12345");
 
-        connectButton = new JButton("Connect");
+        JButton connectButton = new JButton("Connect");
 
         // Add action listener for the button
         connectButton.addActionListener(new ActionListener() {
@@ -58,27 +57,19 @@ public class MultiplayerMenu extends JFrame {
                             "Invalid Port", 
                             JOptionPane.ERROR_MESSAGE);
                     } else {
-                        // Here you can use the serverAddress and port to connect to the server
-                        JOptionPane.showMessageDialog(MultiplayerMenu.this, 
-                            "Connecting to server: " + serverAddress + " on port " + port, 
-                            "Connection Info", 
-                            JOptionPane.INFORMATION_MESSAGE);
-
+                        connectButton.setEnabled(false);
 
                         tcpClient = new TCPClient(serverAddress, port);
-                        tcpClient.getPacketHandler().put(KeepAlivePacket.ID, packet->{
-                            System.out.println("Received Packet");
-                        });
-                        tcpClient.getPacketHandler().put(MazePacket.ID, packet->{
+                        tcpClient.getPacketHandler().put(MazePacket.ID, (packet)->{
                             MazePacket mazePacket = (MazePacket) packet;
                             if (gameInstance.getMazeGame() == null){
-                                gameInstance.setMazeGame(new MazeGame(tcpClient, gameInstance, mazePacket));
+                                gameInstance.setMazeGame(new GameScene(tcpClient, gameInstance, mazePacket));
+                                setVisible(false);
                             }else {
                                 gameInstance.getMazeGame().updateMaze(mazePacket);
                             }
                         });
-
-                        tcpClient.getPacketHandler().put(PositionChangePacket.ID, packet -> {
+                        tcpClient.getPacketHandler().put(PositionChangePacket.ID, (packet) -> {
                             PositionChangePacket positionChangePacket = (PositionChangePacket) packet;
                             if (positionChangePacket.getUsername().equalsIgnoreCase(gameInstance.getProfile().getUsername().toLowerCase())){
                                 gameInstance.getMazeGame().setLocalePosition(positionChangePacket.getX(), positionChangePacket.getY());
@@ -87,13 +78,27 @@ public class MultiplayerMenu extends JFrame {
                                 gameInstance.getMazeGame().changeSpecificPlayerColor(positionChangePacket.getUsername(), positionChangePacket.getColor());
                             }
                         });
-                        tcpClient.getPacketHandler().put(PlayerScorePacket.ID, packet -> {
+                        tcpClient.getPacketHandler().put(PlayerScorePacket.ID, (packet) -> {
                             PlayerScorePacket playerScorePacket = (PlayerScorePacket) packet;
                             if (playerScorePacket.getUsername().equalsIgnoreCase(gameInstance.getProfile().getUsername().toLowerCase())){
                                 gameInstance.getMazeGame().setMyScore(playerScorePacket.getScore());
                             }else {
                                 gameInstance.getMazeGame().changeSpecificPlayerScore(playerScorePacket.getUsername(), playerScorePacket.getScore());
                             }
+                        });
+                        tcpClient.getPacketHandler().put(EndGamePacket.ID, (packet) -> {
+                            EndGamePacket endGamePacket = (EndGamePacket) packet;
+                            if (gameInstance.getMazeGame() != null){
+                                gameInstance.getMazeGame().endGame();
+                            }
+                            tcpClient.stopClient();
+                            gameInstance.setMazeGame(null);
+                            connectButton.setEnabled(true);
+                            setVisible(true);
+                        });
+                        tcpClient.getPacketHandler().put(PlayerCountPacket.ID, packet -> {
+                            PlayerCountPacket playerCountPacket = (PlayerCountPacket) packet;
+                            playerLabel.setText("Waiting for players "+playerCountPacket.getCount() + "/" + playerCountPacket.getMax());
                         });
                         JoinPacket joinRequestPacket = new JoinPacket();
                         joinRequestPacket.setUsername(gameInstance.getProfile().getUsername());
@@ -106,6 +111,7 @@ public class MultiplayerMenu extends JFrame {
                         "Invalid Port", 
                         JOptionPane.ERROR_MESSAGE);
                 } catch (IOException ex) {
+                    connectButton.setEnabled(true);
                     throw new RuntimeException(ex);
                 }
             }
@@ -117,6 +123,7 @@ public class MultiplayerMenu extends JFrame {
         add(portLabel);
         add(portField);
         add(connectButton);
+        add(playerLabel);
     }
 
 }

@@ -9,7 +9,7 @@ public class GameInstance {
     private final Profile profile;
 
     @Setter
-    private MazeGame mazeGame = null;
+    private GameScene mazeGame = null;
 
     public GameInstance(Profile profile) {
         this.profile = profile;
