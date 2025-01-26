@@ -1,17 +1,12 @@
-package net.wattpadpremium.amazinggame;
+package net.wattpadpremium.amazinggame.client;
 
 import net.wattpadpremium.*;
 
-import java.awt.FlowLayout;
+import javax.swing.*;
+import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.IOException;
-
-import javax.swing.JButton;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JOptionPane;
-import javax.swing.JTextField;
 
 public class MultiplayerMenu extends JFrame {
 
@@ -22,7 +17,7 @@ public class MultiplayerMenu extends JFrame {
 
     private final JLabel playerLabel = new JLabel("");
 
-    public MultiplayerMenu(GameInstance gameInstance,GameMenu gameMenu) {
+    public MultiplayerMenu(GameInstance gameInstance, GameMenu gameMenu) {
         gameMenu.setVisible(false);
         setTitle("Multiplayer Menu");
         setSize(400, 200);
@@ -77,6 +72,10 @@ public class MultiplayerMenu extends JFrame {
                                 gameInstance.getMazeGame().setSpecificPlayerPos(positionChangePacket.getUsername(), positionChangePacket.getX(), positionChangePacket.getY());
                                 gameInstance.getMazeGame().changeSpecificPlayerColor(positionChangePacket.getUsername(), positionChangePacket.getColor());
                             }
+                        });
+                        tcpClient.getPacketHandler().put(RemovePlayerPacket.ID, (packet) -> {
+                            RemovePlayerPacket removePlayerPacket = (RemovePlayerPacket) packet;
+                            gameInstance.getMazeGame().removePlayer(removePlayerPacket.getUsername());
                         });
                         tcpClient.getPacketHandler().put(PlayerScorePacket.ID, (packet) -> {
                             PlayerScorePacket playerScorePacket = (PlayerScorePacket) packet;

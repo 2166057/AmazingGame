@@ -1,13 +1,15 @@
-package net.wattpadpremium.amazinggame;
+package net.wattpadpremium.amazinggame.client;
+
+import javafx.scene.media.Media;
+import javafx.scene.media.MediaPlayer;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.util.TimerTask;
-import java.util.Timer;
 
 public class GameMenu extends JFrame {
+
     private JPanel mainPanel;
 
     private final GameInstance gameInstance;
@@ -52,4 +54,6 @@ public class GameMenu extends JFrame {
         gameInstance.getProfile().setColor(colorSelector.getSelectedColor());
         mainPanel.setBackground(gameInstance.getProfile().getColor());
     }
+
+
 }

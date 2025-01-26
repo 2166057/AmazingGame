@@ -41,6 +41,10 @@ public interface Packet {
                 packet = new PlayerCountPacket();
                 packet.readData(payload);
                 return packet;
+            case 8:
+                packet = new RemovePlayerPacket();
+                packet.readData(payload);
+                return packet;
             default:
                 return null;
         }

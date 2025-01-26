@@ -1,6 +1,7 @@
-package net.wattpadpremium;
+package net.wattpadpremium.server;
 
 import lombok.Data;
+import net.wattpadpremium.Packet;
 
 @Data
 public class ServerPlayer {

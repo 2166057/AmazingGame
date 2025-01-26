@@ -55,7 +55,7 @@
                             <createDependencyReducedPom>true</createDependencyReducedPom>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>net.wattpadpremium.GameServer</mainClass>
+                                    <mainClass>net.wattpadpremium.server.GameServer</mainClass>
                                 </transformer>
                             </transformers>
                         </configuration>

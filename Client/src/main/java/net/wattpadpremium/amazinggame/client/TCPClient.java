@@ -1,4 +1,4 @@
-package net.wattpadpremium.amazinggame;
+package net.wattpadpremium.amazinggame.client;
 
 import lombok.Getter;
 import net.wattpadpremium.Packet;

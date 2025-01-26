@@ -1,19 +1,17 @@
-package net.wattpadpremium.amazinggame;
+package net.wattpadpremium.amazinggame.client;
 
 import net.wattpadpremium.MazePacket;
 import net.wattpadpremium.PositionChangePacket;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.KeyEvent;
 import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.HashMap;
 import java.util.Timer;
-import java.util.TimerTask;
+import java.util.*;
 
 public class GameScene extends JFrame {
     private final TCPClient tcpClient;
@@ -28,7 +26,7 @@ public class GameScene extends JFrame {
     private final int viewPortHeight = 10; // Number of visible cells in height
     private int[][] maze;
 
-    java.util.Timer ticking;
+    Timer ticking;
 
     private final boolean[] keyState = new boolean[5]; // 0: UP, 1: DOWN, 2: LEFT, 3: RIGHT, 4: TAB
 
@@ -196,6 +194,10 @@ public class GameScene extends JFrame {
         if (player != null){
             player.setScore(score);
         }
+    }
+
+    public void removePlayer(String username) {
+        otherPlayers.remove(username);
     }
 
     private class KeyHandler extends KeyAdapter {

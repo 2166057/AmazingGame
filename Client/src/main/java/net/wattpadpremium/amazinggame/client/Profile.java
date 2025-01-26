@@ -1,4 +1,4 @@
-package net.wattpadpremium.amazinggame;
+package net.wattpadpremium.amazinggame.client;
 
 import lombok.Data;
 
@@ -9,6 +9,6 @@ import java.util.UUID;
 public class Profile {
 
     private Color color = new Color(231, 38, 116);
-    private String username = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+    private String username = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
 
 }

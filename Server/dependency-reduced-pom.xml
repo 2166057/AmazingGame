@@ -30,7 +30,7 @@
               <createDependencyReducedPom>true</createDependencyReducedPom>
               <transformers>
                 <transformer>
-                  <mainClass>net.wattpadpremium.GameServer</mainClass>
+                  <mainClass>net.wattpadpremium.server.GameServer</mainClass>
                 </transformer>
               </transformers>
             </configuration>

@@ -1,4 +1,4 @@
-package net.wattpadpremium.amazinggame;
+package net.wattpadpremium.amazinggame.client;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -14,6 +14,10 @@ public class GameInstance {
     public GameInstance(Profile profile) {
         this.profile = profile;
         new GameMenu(this).setVisible(true);
+    }
+
+    public static void main(String[] args) {
+        new GameInstance(new Profile());
     }
 
 }

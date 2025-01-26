@@ -1,6 +1,7 @@
-package net.wattpadpremium.handler;
+package net.wattpadpremium.server.handler;
 
 import net.wattpadpremium.*;
+import net.wattpadpremium.server.TCPServer;
 
 import java.io.DataInputStream;
 import java.io.IOException;

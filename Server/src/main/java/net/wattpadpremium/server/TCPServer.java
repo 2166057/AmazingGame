@@ -1,10 +1,9 @@
-package net.wattpadpremium;
+package net.wattpadpremium.server;
 
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
-import net.wattpadpremium.handler.ServerPacketHandler;
-import net.wattpadpremium.handler.ServerPacketListener;
+import net.wattpadpremium.Packet;
+import net.wattpadpremium.server.handler.ServerPacketHandler;
 
 import java.io.*;
 import java.net.*;
@@ -41,8 +40,10 @@ public class TCPServer {
     }
 
     public void broadcastPacket(Packet packet) {
-        for (ClientHandler clientHandler : clientHandlers) {
-            clientHandler.sendPacket(packet);
+        synchronized (clientHandlers){
+            for (ClientHandler clientHandler : clientHandlers) {
+                clientHandler.sendPacket(packet);
+            }
         }
     }
 

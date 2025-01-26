@@ -1,7 +1,7 @@
-package net.wattpadpremium.handler;
+package net.wattpadpremium.server.handler;
 
 import net.wattpadpremium.Packet;
-import net.wattpadpremium.TCPServer;
+import net.wattpadpremium.server.TCPServer;
 
 public interface ServerPacketListener {
 

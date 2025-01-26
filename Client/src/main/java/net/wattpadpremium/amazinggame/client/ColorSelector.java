@@ -1,4 +1,6 @@
-package net.wattpadpremium.amazinggame;
+package net.wattpadpremium.amazinggame.client;
+
+import lombok.Getter;
 
 import javax.swing.*;
 import java.awt.*;
@@ -6,6 +8,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 
 public class ColorSelector extends JDialog {
+    @Getter
     private Color selectedColor;
     private final JColorChooser colorChooser;
 
@@ -45,7 +48,4 @@ public class ColorSelector extends JDialog {
         setVisible(true);
     }
 
-    public Color getSelectedColor() {
-        return selectedColor;
-    }
 }

@@ -1,4 +1,6 @@
-package net.wattpadpremium;
+package net.wattpadpremium.server;
+
+import net.wattpadpremium.*;
 
 import java.awt.*;
 import java.io.IOException;
@@ -10,8 +12,13 @@ public class GameServer {
     private int goalX, goalY;
     private int mazeWidth = 15, mazeHeight = 15;
     private final HashMap<String , ServerPlayer> allPlayers = new HashMap<>();
+//    private final HashMap<String , Bot> bots = new HashMap<>();
+
+
     private int[][] maze;
     private final int maxPlayerCount = 2;
+    private final int minPlayerSize = 1;
+//    private int numberOfBots = 1;
 
     private boolean matchStarted = false;
 
@@ -27,6 +34,9 @@ public class GameServer {
             }
             ServerPlayer serverPlayer = new ServerPlayer(this, clientHandler, joinPacket.getUsername(), joinPacket.getColor());
             System.out.println("Player " + joinPacket.getUsername() +  " has joined the game " + allPlayers.size() + "/" + maxPlayerCount);
+            if (allPlayers.size() >= minPlayerSize){
+                beginCountDown();
+            }
             if (allPlayers.size() == maxPlayerCount){
                 startGame();
             }
@@ -64,6 +74,25 @@ public class GameServer {
         });
         tcpServer.startServer();
     }
+
+    private void beginCountDown() {
+        new Thread(() -> {
+            try {
+                for (int i = 5; i > 0; i--) {
+                    System.out.println("Game starts in " + i + " seconds...");
+                    Thread.sleep(1000);
+                }
+                if (allPlayers.size() >= minPlayerSize && allPlayers.size() <= maxPlayerCount) {
+                    startGame();
+                } else {
+                    System.out.println("Player count is not within range. Game cannot start.");
+                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }).start();
+    }
+
 
     private void sendPlayerScore(ServerPlayer serverPlayer) {
         PlayerScorePacket playerScorePacket = new PlayerScorePacket(serverPlayer.getUsername(),serverPlayer.getScore());
@@ -112,6 +141,11 @@ public class GameServer {
             player.setX(spawnX);
             player.setY(spawnY);
         }
+
+//        for (Bot bot : bots.values()){
+//            bot.updateMaze(maze, spawnX, spawnY, goalX, goalY);
+//        }
+
     }
 
     private void generateMazeUsingRecursiveBacktracking() {
@@ -179,19 +213,27 @@ public class GameServer {
     }
 
     public void playerQuitEvent(ServerPlayer serverPlayer){
-        allPlayers.remove(serverPlayer.getUsername());
-        //TODO send player remove packet
-        if (allPlayers.size() != maxPlayerCount){
+        tcpServer.broadcastPacket(new RemovePlayerPacket(serverPlayer.getUsername()));
+        if (allPlayers.isEmpty()){
             endGame();
         }
     }
 
     private void startGame(){
-        matchStarted = true;
-        generateMap();
-        broadcastMaze();
-        sendPlayerPositions();
+        if (!matchStarted){
+            matchStarted = true;
+//            for (int amount = numberOfBots; amount > 0; amount--){
+//                String botName = "bot"+amount;
+//                Bot bot = new Bot(botName);
+//                System.out.println("Adding bot :" + botName);
+//                bots.put(botName, bot);
+//            }
+            generateMap();
+            broadcastMaze();
+            sendPlayerPositions();
+        }
     }
+
 
     private void endGame() {
         matchStarted = false;
