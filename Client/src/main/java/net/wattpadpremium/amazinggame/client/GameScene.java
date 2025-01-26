@@ -1,14 +1,18 @@
 package net.wattpadpremium.amazinggame.client;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import net.wattpadpremium.MazePacket;
+import net.wattpadpremium.PlayerStatusPacket;
 import net.wattpadpremium.PositionChangePacket;
 
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.io.IOException;
 import java.util.List;
 import java.util.Timer;
 import java.util.*;
@@ -22,9 +26,15 @@ public class GameScene extends JFrame {
     private final int cellSize = 30;
     private int viewPortX = 0;  // X-coordinate of the top-left corner of the viewport
     private int viewPortY = 0;  // Y-coordinate of the top-left corner of the viewport
-    private final int viewPortWidth = 10;  // Number of visible cells in width
-    private final int viewPortHeight = 10; // Number of visible cells in height
+    private final int viewPortWidth = 16*3;  // Number of visible cells in width
+    private final int viewPortHeight = 9*3; // Number of visible cells in height
     private int[][] maze;
+
+    private final HashMap<PlayerStatusPacket.STATUS, Boolean> statusMap = new HashMap<>();
+
+    private final HashMap<UUID, ClientObject> drawables = new HashMap<>();
+
+    private Image goalImage;
 
     Timer ticking;
 
@@ -36,6 +46,16 @@ public class GameScene extends JFrame {
     public GameScene(TCPClient tcpClient, GameInstance gameInstance, MazePacket mazePacket) {
         this.tcpClient = tcpClient;
         this.gameInstance = gameInstance;
+
+        for (PlayerStatusPacket.STATUS value : PlayerStatusPacket.STATUS.values()) {
+            statusMap.put(value, false);
+        }
+
+        try {
+            goalImage = ImageIO.read(Objects.requireNonNull(getClass().getResource("/goal.png")));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
 
         setFocusTraversalKeysEnabled(false);
         addWindowListener(new WindowAdapter() {
@@ -78,15 +98,55 @@ public class GameScene extends JFrame {
                     offScreenGraphics.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
                 } else {
                     int cell = maze[cellY][cellX];
-                    offScreenGraphics.setColor(cell == 1 ? Color.BLACK : Color.WHITE);
+
+                    boolean isBlinded = isStatusActive(PlayerStatusPacket.STATUS.BLINDED);
+
+                    Color normalCellColor = isBlinded ? Color.BLACK : getBackground();
+                    Color wallCellColor = isStatusActive(PlayerStatusPacket.STATUS.GHOSTING) && !isBlinded  ? Color.DARK_GRAY : Color.BLACK;
+
+                    offScreenGraphics.setColor(cell == 1 ? wallCellColor : normalCellColor);
                     offScreenGraphics.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
                 }
             }
         }
 
+        // Render the traps
+        for (ClientObject drawable : drawables.values()) {
+            int trapX = drawable.x - viewPortX;
+            int trapY = drawable.y - viewPortY;
+
+            if (trapX >= 0 && trapX < viewPortWidth && trapY >= 0 && trapY < viewPortHeight) {
+                offScreenGraphics.setColor(drawable.color);
+                offScreenGraphics.fillRoundRect(
+                        trapX * cellSize,
+                        trapY * cellSize,
+                        cellSize,
+                        cellSize,
+                        cellSize / 4,
+                        cellSize / 4
+                );
+            }
+        }
+
         //self
-        offScreenGraphics.setColor(gameInstance.getProfile().getColor());
-        offScreenGraphics.fillOval((localPosX - viewPortX) * cellSize, (localPosY - viewPortY) * cellSize, cellSize, cellSize);
+        boolean invisible = isStatusActive(PlayerStatusPacket.STATUS.INVISIBLE);
+        boolean frozen = isStatusActive(PlayerStatusPacket.STATUS.FROZEN);
+
+        Color playerColor = gameInstance.getProfile().getColor();
+
+        if (frozen) {
+            playerColor = new Color(173, 216, 230);
+        }
+
+        if (frozen) {
+            offScreenGraphics.setColor(Color.WHITE);
+            offScreenGraphics.fillOval((localPosX - viewPortX) * cellSize - 5, (localPosY - viewPortY) * cellSize - 5, cellSize + 10, cellSize + 10); // White outline
+        }
+
+        if (!invisible) {
+            offScreenGraphics.setColor(playerColor);
+            offScreenGraphics.fillOval((localPosX - viewPortX) * cellSize, (localPosY - viewPortY) * cellSize, cellSize, cellSize);
+        }
 
         //server_players
         for (Player player : otherPlayers.values()){
@@ -96,9 +156,17 @@ public class GameScene extends JFrame {
             offScreenGraphics.drawString(player.getUsername(),(player.getX() - viewPortX) * cellSize, (player.getY() - viewPortY) * cellSize);
         }
 
+
         //goal
-        offScreenGraphics.setColor(Color.GREEN);
-        offScreenGraphics.fillRect((goalX - viewPortX) * cellSize, (goalY - viewPortY) * cellSize, cellSize, cellSize);
+        offScreenGraphics.drawImage(
+                goalImage,
+                (goalX - viewPortX) * cellSize,
+                (goalY - viewPortY) * cellSize,
+                cellSize,
+                cellSize,
+                null // ImageObserver, can be null if not needed
+        );
+
 
         if (keyState[4]) {
             int canvasWidth = getWidth();
@@ -200,6 +268,18 @@ public class GameScene extends JFrame {
         otherPlayers.remove(username);
     }
 
+    public void addDrawable(ClientObject clientObject) {
+        drawables.put(clientObject.objectUUID, clientObject);
+    }
+
+    public void removeDrawable(UUID trapID) {
+        drawables.remove(trapID);
+    }
+
+    public void setLocalePlayerStatus(PlayerStatusPacket.STATUS status, boolean enabled) {
+        statusMap.put(status, enabled);
+    }
+
     private class KeyHandler extends KeyAdapter {
         @Override
         public void keyPressed(KeyEvent e) {
@@ -234,8 +314,16 @@ public class GameScene extends JFrame {
         }
     }
 
+    public Boolean isStatusActive(PlayerStatusPacket.STATUS status){
+        return statusMap.get(status);
+    }
+
 
     public void handleContinuousMovement() {
+        if (isStatusActive(PlayerStatusPacket.STATUS.FROZEN)){
+            return;
+        }
+
         int dx = 0;
         int dy = 0;
 
@@ -244,27 +332,36 @@ public class GameScene extends JFrame {
         if (keyState[2]) dx = -1;
         if (keyState[3]) dx = 1;
 
+        if (isStatusActive(PlayerStatusPacket.STATUS.DIZZY)) {
+            dx = -dx;
+            dy = -dy;
+        }
+
         if (dx != 0 || dy != 0) {
             int newX = localPosX + dx;
             int newY = localPosY + dy;
 
-            if (newX >= 0 && newX < mazeSize && newY >= 0 && newY < mazeSize && maze[newY][newX] != 1) {
-                setLocalePosition(newX, newY);
+            boolean isGhost = isStatusActive(PlayerStatusPacket.STATUS.GHOSTING);
 
-                sendPositionChanges();
+            if (newX >= 2 && newX < mazeSize-2 && newY >= 2 && newY < mazeSize-2) {
+                if (isGhost || maze[newY][newX] != 1) {
+                    setLocalePosition(newX, newY);
+                    sendPositionChanges();
 
-                if (localPosX - viewPortX < 2) {
-                    viewPortX = Math.max(localPosX - 2, 0);
-                } else if (localPosX - viewPortX > viewPortWidth - 3) {
-                    viewPortX = Math.min(localPosX - viewPortWidth + 3, mazeSize - viewPortWidth);
-                }
-                if (localPosY - viewPortY < 2) {
-                    viewPortY = Math.max(localPosY - 2, 0);
-                } else if (localPosY - viewPortY > viewPortHeight - 3) {
-                    viewPortY = Math.min(localPosY - viewPortHeight + 3, mazeSize - viewPortHeight);
+                    if (localPosX - viewPortX < 2) {
+                        viewPortX = Math.max(localPosX - 2, 0);
+                    } else if (localPosX - viewPortX > viewPortWidth - 3) {
+                        viewPortX = Math.min(localPosX - viewPortWidth + 3, mazeSize - viewPortWidth);
+                    }
+                    if (localPosY - viewPortY < 2) {
+                        viewPortY = Math.max(localPosY - 2, 0);
+                    } else if (localPosY - viewPortY > viewPortHeight - 3) {
+                        viewPortY = Math.min(localPosY - viewPortHeight + 3, mazeSize - viewPortHeight);
+                    }
                 }
             }
         }
+
     }
 
     private void sendPositionChanges() {

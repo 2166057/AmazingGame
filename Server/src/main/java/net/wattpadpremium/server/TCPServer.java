@@ -93,7 +93,7 @@ public class TCPServer {
                 DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream());
                 out.writeInt(packet.getId());
                 packet.writeData(out);
-                System.out.println("Sending Packet: " + packet);
+//                System.out.println("Sending Packet: " + packet);
                 out.flush();
             } catch (IOException e) {
                 System.err.println("Error sending packet: " + e.getMessage());

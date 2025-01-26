@@ -45,6 +45,14 @@ public interface Packet {
                 packet = new RemovePlayerPacket();
                 packet.readData(payload);
                 return packet;
+            case 9:
+                packet = new TrapPacket();
+                packet.readData(payload);
+                return packet;
+            case 11:
+                packet = new PlayerStatusPacket();
+                packet.readData(payload);
+                return packet;
             default:
                 return null;
         }

@@ -7,6 +7,7 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.IOException;
+import java.util.UUID;
 
 public class MultiplayerMenu extends JFrame {
 
@@ -59,6 +60,7 @@ public class MultiplayerMenu extends JFrame {
                             MazePacket mazePacket = (MazePacket) packet;
                             if (gameInstance.getMazeGame() == null){
                                 gameInstance.setMazeGame(new GameScene(tcpClient, gameInstance, mazePacket));
+                                gameInstance.getMazeGame().setBackground(Color.WHITE);
                                 setVisible(false);
                             }else {
                                 gameInstance.getMazeGame().updateMaze(mazePacket);
@@ -98,6 +100,21 @@ public class MultiplayerMenu extends JFrame {
                         tcpClient.getPacketHandler().put(PlayerCountPacket.ID, packet -> {
                             PlayerCountPacket playerCountPacket = (PlayerCountPacket) packet;
                             playerLabel.setText("Waiting for players "+playerCountPacket.getCount() + "/" + playerCountPacket.getMax());
+                        });
+                        tcpClient.getPacketHandler().put(TrapPacket.ID, packet -> {
+                            TrapPacket trapPacket = (TrapPacket) packet;
+                            UUID drawUUID = UUID.fromString(trapPacket.getTrapID());
+                            if (trapPacket.isDelete()){
+                                gameInstance.getMazeGame().removeDrawable(drawUUID);
+                            }else {
+                                gameInstance.getMazeGame().addDrawable(new ClientObject(trapPacket.getPosX(), trapPacket.getPosY(), new Color(trapPacket.getColor()), UUID.fromString(trapPacket.getTrapID())));
+                            }
+                        });
+                        tcpClient.getPacketHandler().put(PlayerStatusPacket.ID, packet -> {
+                            PlayerStatusPacket playerStatusPacket = (PlayerStatusPacket) packet;
+                            if (gameInstance.getProfile().getUsername().equalsIgnoreCase(((PlayerStatusPacket) packet).getTargetPlayerUsername().toLowerCase())){
+                                gameInstance.getMazeGame().setLocalePlayerStatus(playerStatusPacket.getStatus(), playerStatusPacket.isEnabled());
+                            }
                         });
                         JoinPacket joinRequestPacket = new JoinPacket();
                         joinRequestPacket.setUsername(gameInstance.getProfile().getUsername());

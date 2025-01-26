@@ -1,19 +1,24 @@
 package net.wattpadpremium.server;
 
 import net.wattpadpremium.*;
+import net.wattpadpremium.server.boxes.*;
 
 import java.awt.*;
 import java.io.IOException;
 import java.util.*;
+import java.util.List;
 
-public class GameServer {
+public class GameServer implements GameServerAPI{
 
     public final TCPServer tcpServer;
     private int goalX, goalY;
     private int mazeWidth = 15, mazeHeight = 15;
     private final HashMap<String , ServerPlayer> allPlayers = new HashMap<>();
-//    private final HashMap<String , Bot> bots = new HashMap<>();
 
+    private final HashMap<UUID, Trap> trapMap = new HashMap<>();
+
+    private int spawnX = 0,spawnY = 0;
+//    private final HashMap<String , Bot> bots = new HashMap<>();
 
     private int[][] maze;
     private final int maxPlayerCount = 2;
@@ -47,30 +52,45 @@ public class GameServer {
                 player.sendPacket(playerCountPacket);
             });
         });
+
         tcpServer.getServerPacketHandler().put(PositionChangePacket.ID, (packet, clientHandler) -> {
             ServerPlayer serverPlayer = clientHandler.getServerPlayer();
             PositionChangePacket positionChangePacket = (PositionChangePacket) packet;
             if (serverPlayer != null) {
                 serverPlayer.setX(positionChangePacket.getX());
                 serverPlayer.setY(positionChangePacket.getY());
-                serverPlayer.setColor(positionChangePacket.getColor());
             }else {
                 return;
             }
-            System.out.println(positionChangePacket.getUsername() + " moved to " +positionChangePacket.getX() + " _ " + positionChangePacket.getY());
+//            System.out.println(positionChangePacket.getUsername() + " moved to " +positionChangePacket.getX() + " _ " + positionChangePacket.getY());
 
-            for (ServerPlayer player : allPlayers.values()){
-                if (player.getX() == goalX && player.getY() == goalY) {
-                    serverPlayer.setScore(serverPlayer.getScore()+1);
-                    mazeWidth += 2;
-                    mazeHeight += 2;
-                    generateMap();
-                    broadcastMaze();
-                    sendPlayerScore(serverPlayer);
-                    break;
-                }
+            if (serverPlayer.getX() == goalX && serverPlayer.getY() == goalY) {
+                serverPlayer.setScore(serverPlayer.getScore()+1);
+                mazeWidth += 2;
+                mazeHeight += 2;
+                generateMap();
+                broadcastMaze();
             }
-            sendPlayerPositions();
+
+
+            List<UUID> trapsToRemove = new ArrayList<>();
+            trapMap.forEach((uuid, trap) -> {
+                if (trap.getPosX() == serverPlayer.getX() && trap.getPosY() == serverPlayer.getY()){
+                    System.out.println(serverPlayer.getUsername() + " stepped on trap " + trap.getTrapUUID());
+                    trap.onTrigger(this, serverPlayer);
+                    if (trap.isDeleted()){
+                        trapsToRemove.add(trap.getTrapUUID());
+                    }
+                }
+            });
+
+            trapsToRemove.forEach(uuid -> {
+                removeTrap(trapMap.get(uuid));
+            });
+
+
+
+            broadcastPositionsToAll();
         });
         tcpServer.startServer();
     }
@@ -93,20 +113,9 @@ public class GameServer {
         }).start();
     }
 
-
-    private void sendPlayerScore(ServerPlayer serverPlayer) {
-        PlayerScorePacket playerScorePacket = new PlayerScorePacket(serverPlayer.getUsername(),serverPlayer.getScore());
-        tcpServer.broadcastPacket(playerScorePacket);
-    }
-
-    private void sendPlayerPositions() {
+    private void broadcastPositionsToAll() {
         for (ServerPlayer player : allPlayers.values()){
-            PositionChangePacket positionChangePacket = new PositionChangePacket();
-            positionChangePacket.setUsername(player.getUsername());
-            positionChangePacket.setX(player.getX());
-            positionChangePacket.setY(player.getY());
-            positionChangePacket.setColor(player.getColor());
-            tcpServer.broadcastPacket(positionChangePacket);
+            notifyPositionChangeToClients(player);
         }
     }
 
@@ -127,8 +136,7 @@ public class GameServer {
         Random random = new Random();
         generateMazeUsingRecursiveBacktracking();
 
-        int spawnX;
-        int spawnY;
+
         do {
             spawnX = random.nextInt(mazeWidth);
             spawnY = random.nextInt(mazeHeight);
@@ -136,6 +144,48 @@ public class GameServer {
             goalY = random.nextInt(mazeHeight);
 
         } while (maze[spawnY][spawnX] != 0 || maze[goalY][goalX] != 0);
+
+
+        //Generate Traps
+        Set<String> trapPositions = new HashSet<>();
+        while (trapMap.size() < 10) {
+            int posX = random.nextInt(mazeWidth);
+            int posY = random.nextInt(mazeHeight);
+            String key = posX + "," + posY;
+
+            if (maze[posY][posX] == 0 && !trapPositions.contains(key)) {
+                Trap trap;
+
+                // Randomly select a trap type
+                int trapType = new Random().nextInt(6); // 0, 1, 2 or 3
+                switch (trapType) {
+                    case 0:
+                        trap = new RestartTrap(this, posX, posY);
+                        break;
+                    case 1:
+                        trap = new DizzyTrap(this, posX, posY);
+                        break;
+                    case 2:
+                        trap = new BlindnessTrap(this, posX, posY);
+                        break;
+                    case 3:
+                        trap = new GhostBonus(this, posX, posY);
+                        break;
+                    case 4:
+                        trap = new StatusTrap(this, posX, posY, PlayerStatusPacket.STATUS.INVISIBLE);
+                        break;
+                    case 5:
+                        trap = new StatusTrap(this, posX, posY, PlayerStatusPacket.STATUS.FROZEN);
+                        break;
+                    default:
+                        throw new IllegalStateException("Unexpected value: " + trapType);
+                }
+
+                spawnTrap(trap);
+                trapPositions.add(key);
+            }
+
+        }
 
         for (ServerPlayer player : allPlayers.values()){
             player.setX(spawnX);
@@ -230,7 +280,7 @@ public class GameServer {
 //            }
             generateMap();
             broadcastMaze();
-            sendPlayerPositions();
+            broadcastPositionsToAll();
         }
     }
 
@@ -238,5 +288,74 @@ public class GameServer {
     private void endGame() {
         matchStarted = false;
         tcpServer.broadcastPacket(new EndGamePacket());
+    }
+
+    @Override
+    public int[][] getMaze() {
+        return new int[0][];
+    }
+
+    @Override
+    public int getGoalX() {
+        return goalX;
+    }
+
+    @Override
+    public int getGoalY() {
+        return goalY;
+    }
+
+    @Override
+    public ServerPlayer getServerPlayer(String username) {
+        return allPlayers.get(username);
+    }
+
+    @Override
+    public List<ServerPlayer> getServerPlayers() {
+        return new ArrayList<>(allPlayers.values());
+    }
+
+    @Override
+    public int getSpawnX() {
+        return spawnX;
+    }
+
+    @Override
+    public int getSpawnY() {
+        return spawnY;
+    }
+
+    @Override
+    public void notifyPositionChangeToClients(ServerPlayer serverPlayer) {
+        PositionChangePacket positionChangePacket = new PositionChangePacket();
+        positionChangePacket.setUsername(serverPlayer.getUsername());
+        positionChangePacket.setX(serverPlayer.getX());
+        positionChangePacket.setY(serverPlayer.getY());
+        positionChangePacket.setColor(serverPlayer.getColor());
+        tcpServer.broadcastPacket(positionChangePacket);
+    }
+
+    public void onVisibilityChange(Trap trap) {
+        TrapPacket trapPacket;
+        if (trap.isVisible()){
+            trapPacket = new TrapPacket(trap.getTrapUUID().toString(), trap.getPosX(), trap.getPosY(), Color.ORANGE.getRGB(), false);
+        }else {
+            trapPacket = new TrapPacket(trap.getTrapUUID().toString(), trap.getPosX(), trap.getPosY(), Color.ORANGE.getRGB(), true);
+        }
+        tcpServer.broadcastPacket(trapPacket);
+    }
+
+    @Override
+    public void removeTrap(Trap trap) {
+        trapMap.remove(trap.getTrapUUID());
+        if (!trap.isDeleted()){
+            trap.setDeleted(true);
+        }
+        trap.changeVisibility(false);
+    }
+
+    @Override
+    public void spawnTrap(Trap trap) {
+        trapMap.put(trap.getTrapUUID(), trap);
     }
 }
