@@ -21,7 +21,7 @@ public class GameServer implements GameServerAPI{
 //    private final HashMap<String , Bot> bots = new HashMap<>();
 
     private int[][] maze;
-    private final int maxPlayerCount = 2;
+    private final int maxPlayerCount = 3;
     private final int minPlayerSize = 1;
 //    private int numberOfBots = 1;
 
@@ -88,8 +88,6 @@ public class GameServer implements GameServerAPI{
                 removeTrap(trapMap.get(uuid));
             });
 
-
-
             broadcastPositionsToAll();
         });
         tcpServer.startServer();
@@ -135,7 +133,6 @@ public class GameServer implements GameServerAPI{
     private void generateMap() {
         Random random = new Random();
         generateMazeUsingRecursiveBacktracking();
-
 
         do {
             spawnX = random.nextInt(mazeWidth);
@@ -190,11 +187,17 @@ public class GameServer implements GameServerAPI{
         for (ServerPlayer player : allPlayers.values()){
             player.setX(spawnX);
             player.setY(spawnY);
+            //resetPlayer status
+            for (PlayerStatusPacket.STATUS status : PlayerStatusPacket.STATUS.values()){
+                player.setStatus(status,false);
+            }
         }
 
 //        for (Bot bot : bots.values()){
 //            bot.updateMaze(maze, spawnX, spawnY, goalX, goalY);
 //        }
+
+
 
     }
 
