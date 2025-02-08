@@ -72,7 +72,7 @@
                         <createDependencyReducedPom>true</createDependencyReducedPom>
                         <transformers>
                             <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                <mainClass>net.wattpadpremium.amazinggame.client.GameInstance</mainClass>
+                                <mainClass>net.wattpadpremium.amazinggame.client.Game</mainClass>
                             </transformer>
                         </transformers>
                     </configuration>

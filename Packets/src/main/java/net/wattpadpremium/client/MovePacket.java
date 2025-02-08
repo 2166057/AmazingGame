@@ -1,16 +1,18 @@
-package net.wattpadpremium;
+package net.wattpadpremium.client;
 
-import lombok.Getter;
+import lombok.Data;
+import net.wattpadpremium.Packet;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
+@Data
+public class MovePacket implements Packet {
 
-@Getter
-public class KeepAlivePacket implements Packet {
+    public static final int ID = 14;
 
-    public static final int ID = 1;
+    private int x = 0, y = 0;
 
     @Override
     public int getPacketId() {
@@ -19,12 +21,13 @@ public class KeepAlivePacket implements Packet {
 
     @Override
     public void readData(DataInputStream input) throws IOException {
-
+        x = input.readInt();
+        y = input.readInt();
     }
 
     @Override
     public void writeData(DataOutputStream output) throws IOException {
-
+        output.writeInt(x);
+        output.writeInt(y);
     }
-
 }

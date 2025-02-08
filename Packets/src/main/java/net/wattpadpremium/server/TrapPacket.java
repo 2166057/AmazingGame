@@ -1,8 +1,9 @@
-package net.wattpadpremium;
+package net.wattpadpremium.server;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import net.wattpadpremium.Packet;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -22,7 +23,7 @@ public class TrapPacket implements Packet {
     private boolean delete;
 
     @Override
-    public int getId() {
+    public int getPacketId() {
         return ID;
     }
 

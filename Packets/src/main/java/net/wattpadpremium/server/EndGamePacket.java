@@ -1,4 +1,6 @@
-package net.wattpadpremium;
+package net.wattpadpremium.server;
+
+import net.wattpadpremium.Packet;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -9,7 +11,7 @@ public class EndGamePacket implements Packet {
     public static final int ID = 6;
 
     @Override
-    public int getId() {
+    public int getPacketId() {
         return ID;
     }
 

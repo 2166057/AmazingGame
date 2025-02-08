@@ -1,37 +1,34 @@
-package net.wattpadpremium;
+package net.wattpadpremium.server;
 
 import lombok.Data;
-import lombok.Getter;
+import net.wattpadpremium.Packet;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-@Getter
 @Data
-public class RemovePlayerPacket implements Packet{
+public class AcceptConnectionPacket implements Packet {
 
-    public RemovePlayerPacket(){}
+    public static final int ID = 13;
 
-    public static final int ID = 8;
     private String username;
-
-    public RemovePlayerPacket(String username) {
-        this.username = username;
-    }
+    private long playerId;
 
     @Override
-    public int getId() {
-        return RemovePlayerPacket.ID;
+    public int getPacketId() {
+        return ID;
     }
 
     @Override
     public void readData(DataInputStream input) throws IOException {
         username = input.readUTF();
+        playerId = input.readLong();
     }
 
     @Override
     public void writeData(DataOutputStream output) throws IOException {
         output.writeUTF(username);
+        output.writeLong(playerId);
     }
 }

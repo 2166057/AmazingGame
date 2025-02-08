@@ -30,7 +30,7 @@
               <createDependencyReducedPom>true</createDependencyReducedPom>
               <transformers>
                 <transformer>
-                  <mainClass>net.wattpadpremium.amazinggame.client.GameInstance</mainClass>
+                  <mainClass>net.wattpadpremium.amazinggame.client.Game</mainClass>
                 </transformer>
               </transformers>
             </configuration>

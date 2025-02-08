@@ -3,16 +3,21 @@ package net.wattpadpremium.amazinggame.client;
 import lombok.Getter;
 import net.wattpadpremium.Packet;
 import net.wattpadpremium.PacketHandler;
+import net.wattpadpremium.client.JoinRequestPacket;
+import net.wattpadpremium.server.*;
 
+import java.awt.*;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 public class TCPClient {
 
     private final Socket socket;
+
     @Getter
     private final PacketHandler packetHandler;
 
@@ -27,9 +32,9 @@ public class TCPClient {
         CompletableFuture.runAsync(()->{
             try {
                 DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-                out.writeInt(packet.getId());
+                out.writeInt(packet.getPacketId());
                 packet.writeData(out);
-//                System.out.println("Sending Packet: " + packet);
+                System.out.println("Sending Packet: " + packet);
                 out.flush();
             } catch (IOException e) {
                 System.err.println("Error sending packet: " + e.getMessage());

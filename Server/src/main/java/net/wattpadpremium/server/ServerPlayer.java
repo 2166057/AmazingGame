@@ -3,10 +3,6 @@ package net.wattpadpremium.server;
 import lombok.Getter;
 import lombok.Setter;
 import net.wattpadpremium.Packet;
-import net.wattpadpremium.PlayerScorePacket;
-import net.wattpadpremium.PlayerStatusPacket;
-
-import java.awt.*;
 
 public class ServerPlayer {
 
@@ -21,34 +17,33 @@ public class ServerPlayer {
     @Setter
     private int x = 0, y = 0;
 
+    @Getter
+    private final Long playerId;
+
     private final TCPServer.ClientHandler clientHandler;
     private final GameServer gameServer;
 
-    public ServerPlayer(GameServer gameServer, TCPServer.ClientHandler clientHandler, String username, int color) {
+    public ServerPlayer(GameServer gameServer, TCPServer.ClientHandler clientHandler, Long id, String username, int color) {
         this.clientHandler = clientHandler;
         this.gameServer = gameServer;
         this.username = username;
         this.color = color;
+        this.playerId = id;
         clientHandler.setServerPlayer(this);
+    }
+
+    public void onConnectMatch(){
         gameServer.playerJoinEvent(this);
     }
 
     public void setStatus(PlayerStatusPacket.STATUS status, boolean enabled){
-        PlayerStatusPacket playerStatusPacket = new PlayerStatusPacket(getUsername(), status, enabled);
+        PlayerStatusPacket playerStatusPacket = new PlayerStatusPacket(getPlayerId(), status, enabled);
         sendPacket(playerStatusPacket);
-    }
-
-    public void setBlind(boolean blind){
-        setStatus(PlayerStatusPacket.STATUS.BLINDED, blind);
-    }
-
-    public void setDizzy(boolean dizzy){
-        setStatus(PlayerStatusPacket.STATUS.DIZZY, dizzy);
     }
 
     public void setScore(int score){
         this.score = score;
-        PlayerScorePacket playerScorePacket = new PlayerScorePacket(username, score);
+        PlayerScorePacket playerScorePacket = new PlayerScorePacket(getPlayerId(), score);
         gameServer.tcpServer.broadcastPacket(playerScorePacket);
     }
 

@@ -91,7 +91,7 @@ public class TCPServer {
         public void sendPacket(Packet packet) {
             try {
                 DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream());
-                out.writeInt(packet.getId());
+                out.writeInt(packet.getPacketId());
                 packet.writeData(out);
 //                System.out.println("Sending Packet: " + packet);
                 out.flush();

@@ -1,9 +1,10 @@
 package net.wattpadpremium.amazinggame.client;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
-import net.wattpadpremium.MazePacket;
-import net.wattpadpremium.PlayerStatusPacket;
-import net.wattpadpremium.PositionChangePacket;
+import net.wattpadpremium.SessionManager;
+import net.wattpadpremium.client.AuthSessionPacket;
+import net.wattpadpremium.client.JoinRequestPacket;
+import net.wattpadpremium.client.MovePacket;
+import net.wattpadpremium.server.*;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
@@ -17,10 +18,14 @@ import java.util.List;
 import java.util.Timer;
 import java.util.*;
 
-public class GameScene extends JFrame {
-    private final TCPClient tcpClient;
+public class PlayScene extends JFrame {
+
+    private final Game game;
+    private Player localPlayer;
+    private TCPClient tcpClient;
+
     private int localPosX = 0, localPosY = 0;
-    private final HashMap<String, Player> otherPlayers = new HashMap<>();
+    private final HashMap<Long, Player> otherPlayers = new HashMap<>();
     private int goalX = 0, goalY = 0;
     private int mazeSize = 15;
     private final int cellSize = 30;
@@ -34,18 +39,95 @@ public class GameScene extends JFrame {
 
     private final HashMap<UUID, ClientObject> drawables = new HashMap<>();
 
-    private Image goalImage;
+    private final Image goalImage;
 
-    Timer ticking;
+    private Timer ticking;
 
     private final boolean[] keyState = new boolean[5]; // 0: UP, 1: DOWN, 2: LEFT, 3: RIGHT, 4: TAB
 
-    private final GameInstance gameInstance;
     private int score = 0;
 
-    public GameScene(TCPClient tcpClient, GameInstance gameInstance, MazePacket mazePacket) {
-        this.tcpClient = tcpClient;
-        this.gameInstance = gameInstance;
+
+    public void joinServer(String address, int port){
+        try {
+            tcpClient = new TCPClient(address, port);
+            AuthSessionPacket authSessionPacket = new AuthSessionPacket();
+            String sessionToken = SessionManager.createUserSessionToken(game.getGameVariables().getUserToken(), address);
+            authSessionPacket.setSessionToken(sessionToken);
+
+            //setupPacketListener
+            tcpClient.getPacketHandler().put(AcceptConnectionPacket.ID, (packet -> {
+                AcceptConnectionPacket acceptConnectionPacket = (AcceptConnectionPacket) packet;
+
+                localPlayer = new Player();
+                localPlayer.setUsername(acceptConnectionPacket.getUsername());
+                localPlayer.setPlayerId(acceptConnectionPacket.getPlayerId());
+
+                game.getPlayScene().setVisible(true);
+                game.getMultiplayerMenu().setVisible(false);
+
+                startTicking();
+            }));
+            tcpClient.getPacketHandler().put(MazePacket.ID, (packet)->{
+                MazePacket mazePacket = (MazePacket) packet;
+                updateMaze(mazePacket);
+            });
+            tcpClient.getPacketHandler().put(PositionChangePacket.ID, (packet) -> {
+                PositionChangePacket positionChangePacket = (PositionChangePacket) packet;
+
+                System.out.println("Received position changed "+packet);
+
+                if (positionChangePacket.getPlayerId() == localPlayer.getPlayerId()){
+                    setLocalePosition(positionChangePacket.getX(), positionChangePacket.getY());
+                }else {
+                    setSpecificPlayerPos(positionChangePacket.getPlayerId(), positionChangePacket.getX(), positionChangePacket.getY());
+                    changeSpecificPlayerColor(positionChangePacket.getPlayerId(), positionChangePacket.getColor());
+                }
+            });
+            tcpClient.getPacketHandler().put(RemovePlayerPacket.ID, (packet) -> {
+                RemovePlayerPacket removePlayerPacket = (RemovePlayerPacket) packet;
+                removePlayer(removePlayerPacket.getPlayedId());
+            });
+            tcpClient.getPacketHandler().put(PlayerScorePacket.ID, (packet) -> {
+                PlayerScorePacket playerScorePacket = (PlayerScorePacket) packet;
+                if (playerScorePacket.getPlayerId() == localPlayer.getPlayerId()){
+                    setMyScore(playerScorePacket.getScore());
+                }else {
+                    changeSpecificPlayerScore(playerScorePacket.getPlayerId(), playerScorePacket.getScore());
+                }
+            });
+            tcpClient.getPacketHandler().put(EndGamePacket.ID, (packet) -> {
+                EndGamePacket endGamePacket = (EndGamePacket) packet;
+                endGame();
+            });
+            tcpClient.getPacketHandler().put(PlayerCountPacket.ID, packet -> {
+                PlayerCountPacket playerCountPacket = (PlayerCountPacket) packet;
+//            playerLabel.setText("Waiting for players "+playerCountPacket.getCount() + "/" + playerCountPacket.getMax());
+            });
+            tcpClient.getPacketHandler().put(TrapPacket.ID, packet -> {
+                TrapPacket trapPacket = (TrapPacket) packet;
+                UUID drawUUID = UUID.fromString(trapPacket.getTrapID());
+                if (trapPacket.isDelete()){
+                    removeDrawable(drawUUID);
+                }else {
+                    addDrawable(new ClientObject(trapPacket.getPosX(), trapPacket.getPosY(), new Color(trapPacket.getColor()), UUID.fromString(trapPacket.getTrapID())));
+                }
+            });
+            tcpClient.getPacketHandler().put(PlayerStatusPacket.ID, packet -> {
+                PlayerStatusPacket playerStatusPacket = (PlayerStatusPacket) packet;
+                if (localPlayer.getPlayerId() == playerStatusPacket.getPlayerId()){
+                    setLocalePlayerStatus(playerStatusPacket.getStatus(), playerStatusPacket.isEnabled());
+                }
+            });
+            tcpClient.sendPacket(authSessionPacket);
+        } catch (IOException | InterruptedException ignored) {
+
+        }
+    }
+
+    public PlayScene(Game game) {
+        this.game = game;
+        setVisible(false);
 
         for (PlayerStatusPacket.STATUS value : PlayerStatusPacket.STATUS.values()) {
             statusMap.put(value, false);
@@ -65,28 +147,23 @@ public class GameScene extends JFrame {
             }
         });
 
-        updateMaze(mazePacket);
         setSize(viewPortWidth * cellSize, viewPortHeight * cellSize);
         setResizable(false);
         addKeyListener(new KeyHandler());
-        setVisible(true);
-        localPosX = 0;
-        localPosY = 0;
 
-        ticking = new Timer();
-        ticking.scheduleAtFixedRate(new TimerTask() {
-            @Override
-            public void run() {
-                handleContinuousMovement();
-                repaint();
-            }
-        }, 0, 50);
+
     }
 
     @Override
     public void paint(Graphics g) {
         Image offScreenBuffer = createImage(getWidth(), getHeight());
         Graphics offScreenGraphics = offScreenBuffer.getGraphics();
+
+        if (maze == null){
+            offScreenGraphics.drawString("Loading Terrain...", viewPortWidth/2 ,viewPortHeight/2);
+            g.drawImage(offScreenBuffer, 0, 0, this);
+            return;
+        }
 
         //maze
         for (int x = 0; x < viewPortWidth; x++) {
@@ -132,7 +209,7 @@ public class GameScene extends JFrame {
         boolean invisible = isStatusActive(PlayerStatusPacket.STATUS.INVISIBLE);
         boolean frozen = isStatusActive(PlayerStatusPacket.STATUS.FROZEN);
 
-        Color playerColor = gameInstance.getProfile().getColor();
+        Color playerColor = localPlayer.getColor();
 
         if (frozen) {
             playerColor = new Color(173, 216, 230);
@@ -152,8 +229,8 @@ public class GameScene extends JFrame {
         for (Player player : otherPlayers.values()){
             offScreenGraphics.setColor(player.getColor());
             offScreenGraphics.fillOval((player.getX() - viewPortX) * cellSize, (player.getY() - viewPortY) * cellSize, cellSize, cellSize);
-            offScreenGraphics.setColor(Color.GRAY);
-            offScreenGraphics.drawString(player.getUsername(),(player.getX() - viewPortX) * cellSize, (player.getY() - viewPortY) * cellSize);
+//            offScreenGraphics.setColor(Color.GRAY);
+//            offScreenGraphics.drawString(player.getUsername(),(player.getX() - viewPortX) * cellSize, (player.getY() - viewPortY) * cellSize);
         }
 
 
@@ -179,7 +256,7 @@ public class GameScene extends JFrame {
             List<Player> copy = new ArrayList<>(otherPlayers.values());
 
             Player localPlayer = new Player();
-            localPlayer.setUsername(gameInstance.getProfile().getUsername());
+            localPlayer.setUsername(localPlayer.getUsername());
             localPlayer.setScore(score);
             copy.add(localPlayer);
 
@@ -220,29 +297,29 @@ public class GameScene extends JFrame {
         localPosY = y;
     }
 
-    public void setSpecificPlayerPos(String username, int x, int y) {
-        Player player = otherPlayers.get(username);
+    public void setSpecificPlayerPos(Long playerId, int x, int y) {
+        Player player = otherPlayers.get(playerId);
         if (player != null){
             player.setX(x);
             player.setY(y);
         }else {
             Player newPlayer = new Player() ;
-            newPlayer.setUsername(username);
+            newPlayer.setPlayerId(playerId);
             newPlayer.setX(x);
             newPlayer.setY(y);
-            otherPlayers.putIfAbsent(username, newPlayer);
+            otherPlayers.putIfAbsent(playerId, newPlayer);
         }
     }
 
-    public void changeSpecificPlayerColor(String username, int color) {
-        Player player = otherPlayers.get(username);
+    public void changeSpecificPlayerColor(Long playerId, int color) {
+        Player player = otherPlayers.get(playerId);
         if (player != null){
             player.setColor(new Color(color));
         }else {
             Player newPlayer = new Player() ;
-            newPlayer.setUsername(username);
+            newPlayer.setPlayerId(playerId);
             newPlayer.setColor(new Color(color));
-            otherPlayers.putIfAbsent(username, newPlayer);
+            otherPlayers.putIfAbsent(playerId, newPlayer);
         }
     }
 
@@ -257,14 +334,14 @@ public class GameScene extends JFrame {
         this.score = score;
     }
 
-    public void changeSpecificPlayerScore(String username, int score) {
-        Player player = otherPlayers.get(username);
+    public void changeSpecificPlayerScore(long playerId, int score) {
+        Player player = otherPlayers.get(playerId);
         if (player != null){
             player.setScore(score);
         }
     }
 
-    public void removePlayer(String username) {
+    public void removePlayer(Long username) {
         otherPlayers.remove(username);
     }
 
@@ -341,6 +418,10 @@ public class GameScene extends JFrame {
             int newX = localPosX + dx;
             int newY = localPosY + dy;
 
+            System.out.println("previous pos "+localPosX + "," + localPosY);
+
+            System.out.println("new pos "+newX + "," + newY);
+
             boolean isGhost = isStatusActive(PlayerStatusPacket.STATUS.GHOSTING);
 
             if (newX >= 2 && newX < mazeSize-2 && newY >= 2 && newY < mazeSize-2) {
@@ -364,18 +445,36 @@ public class GameScene extends JFrame {
 
     }
 
+
     private void sendPositionChanges() {
-        PositionChangePacket packet = new PositionChangePacket();
-        packet.setUsername(gameInstance.getProfile().getUsername());
-        packet.setColor(gameInstance.getProfile().getColor().getRGB());
+        MovePacket packet = new MovePacket();
         packet.setY(localPosY);
         packet.setX(localPosX);
         tcpClient.sendPacket(packet);
     }
 
     public void endGame(){
-        ticking.cancel();
+        stopTicking();
+        tcpClient.stopClient();
         this.setVisible(false);
-        this.dispose();
+        this.game.getMainMenu().setVisible(true);
+    }
+
+    private void startTicking(){
+        stopTicking();
+        ticking = new Timer();
+        ticking.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                handleContinuousMovement();
+                repaint();
+            }
+        }, 0, 50);
+    }
+
+    private void stopTicking(){
+        if (ticking != null){
+            ticking.cancel();
+        }
     }
 }

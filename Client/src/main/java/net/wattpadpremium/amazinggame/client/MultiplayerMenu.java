@@ -1,26 +1,20 @@
 package net.wattpadpremium.amazinggame.client;
 
-import net.wattpadpremium.*;
-
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.IOException;
-import java.util.UUID;
 
 public class MultiplayerMenu extends JFrame {
-
-    private TCPClient tcpClient;
 
     private final JTextField serverAddressField;
     private final JTextField portField;
 
     private final JLabel playerLabel = new JLabel("");
 
-    public MultiplayerMenu(GameInstance gameInstance, GameMenu gameMenu) {
-        gameMenu.setVisible(false);
+    public MultiplayerMenu(Game game) {
         setTitle("Multiplayer Menu");
+        setVisible(false);
         setSize(400, 200);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
@@ -37,14 +31,12 @@ public class MultiplayerMenu extends JFrame {
 
         JButton connectButton = new JButton("Connect");
 
-        // Add action listener for the button
         connectButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 String serverAddress = serverAddressField.getText();
                 String portText = portField.getText();
                 
-                // Validate the input
                 try {
                     int port = Integer.parseInt(portText);
                     if (port < 1024 || port > 65535) {
@@ -54,86 +46,17 @@ public class MultiplayerMenu extends JFrame {
                             JOptionPane.ERROR_MESSAGE);
                     } else {
                         connectButton.setEnabled(false);
-
-                        tcpClient = new TCPClient(serverAddress, port);
-                        tcpClient.getPacketHandler().put(MazePacket.ID, (packet)->{
-                            MazePacket mazePacket = (MazePacket) packet;
-                            if (gameInstance.getMazeGame() == null){
-                                gameInstance.setMazeGame(new GameScene(tcpClient, gameInstance, mazePacket));
-                                gameInstance.getMazeGame().setBackground(Color.WHITE);
-                                setVisible(false);
-                            }else {
-                                gameInstance.getMazeGame().updateMaze(mazePacket);
-                            }
-                        });
-                        tcpClient.getPacketHandler().put(PositionChangePacket.ID, (packet) -> {
-                            PositionChangePacket positionChangePacket = (PositionChangePacket) packet;
-                            if (positionChangePacket.getUsername().equalsIgnoreCase(gameInstance.getProfile().getUsername().toLowerCase())){
-                                gameInstance.getMazeGame().setLocalePosition(positionChangePacket.getX(), positionChangePacket.getY());
-                            }else {
-                                gameInstance.getMazeGame().setSpecificPlayerPos(positionChangePacket.getUsername(), positionChangePacket.getX(), positionChangePacket.getY());
-                                gameInstance.getMazeGame().changeSpecificPlayerColor(positionChangePacket.getUsername(), positionChangePacket.getColor());
-                            }
-                        });
-                        tcpClient.getPacketHandler().put(RemovePlayerPacket.ID, (packet) -> {
-                            RemovePlayerPacket removePlayerPacket = (RemovePlayerPacket) packet;
-                            gameInstance.getMazeGame().removePlayer(removePlayerPacket.getUsername());
-                        });
-                        tcpClient.getPacketHandler().put(PlayerScorePacket.ID, (packet) -> {
-                            PlayerScorePacket playerScorePacket = (PlayerScorePacket) packet;
-                            if (playerScorePacket.getUsername().equalsIgnoreCase(gameInstance.getProfile().getUsername().toLowerCase())){
-                                gameInstance.getMazeGame().setMyScore(playerScorePacket.getScore());
-                            }else {
-                                gameInstance.getMazeGame().changeSpecificPlayerScore(playerScorePacket.getUsername(), playerScorePacket.getScore());
-                            }
-                        });
-                        tcpClient.getPacketHandler().put(EndGamePacket.ID, (packet) -> {
-                            EndGamePacket endGamePacket = (EndGamePacket) packet;
-                            if (gameInstance.getMazeGame() != null){
-                                gameInstance.getMazeGame().endGame();
-                            }
-                            tcpClient.stopClient();
-                            gameInstance.setMazeGame(null);
-                            connectButton.setEnabled(true);
-                            setVisible(true);
-                        });
-                        tcpClient.getPacketHandler().put(PlayerCountPacket.ID, packet -> {
-                            PlayerCountPacket playerCountPacket = (PlayerCountPacket) packet;
-                            playerLabel.setText("Waiting for players "+playerCountPacket.getCount() + "/" + playerCountPacket.getMax());
-                        });
-                        tcpClient.getPacketHandler().put(TrapPacket.ID, packet -> {
-                            TrapPacket trapPacket = (TrapPacket) packet;
-                            UUID drawUUID = UUID.fromString(trapPacket.getTrapID());
-                            if (trapPacket.isDelete()){
-                                gameInstance.getMazeGame().removeDrawable(drawUUID);
-                            }else {
-                                gameInstance.getMazeGame().addDrawable(new ClientObject(trapPacket.getPosX(), trapPacket.getPosY(), new Color(trapPacket.getColor()), UUID.fromString(trapPacket.getTrapID())));
-                            }
-                        });
-                        tcpClient.getPacketHandler().put(PlayerStatusPacket.ID, packet -> {
-                            PlayerStatusPacket playerStatusPacket = (PlayerStatusPacket) packet;
-                            if (gameInstance.getProfile().getUsername().equalsIgnoreCase(((PlayerStatusPacket) packet).getTargetPlayerUsername().toLowerCase())){
-                                gameInstance.getMazeGame().setLocalePlayerStatus(playerStatusPacket.getStatus(), playerStatusPacket.isEnabled());
-                            }
-                        });
-                        JoinPacket joinRequestPacket = new JoinPacket();
-                        joinRequestPacket.setUsername(gameInstance.getProfile().getUsername());
-                        joinRequestPacket.setColor(gameInstance.getProfile().getColor().getRGB());
-                        tcpClient.sendPacket(joinRequestPacket);
+                        game.getPlayScene().joinServer(serverAddress, port);
                     }
                 } catch (NumberFormatException ex) {
                     JOptionPane.showMessageDialog(MultiplayerMenu.this, 
                         "Please enter a valid port number.", 
                         "Invalid Port", 
                         JOptionPane.ERROR_MESSAGE);
-                } catch (IOException ex) {
-                    connectButton.setEnabled(true);
-                    throw new RuntimeException(ex);
                 }
             }
         });
 
-        // Add the components to the frame
         add(serverLabel);
         add(serverAddressField);
         add(portLabel);

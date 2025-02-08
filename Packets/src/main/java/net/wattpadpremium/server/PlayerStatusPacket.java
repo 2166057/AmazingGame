@@ -1,8 +1,9 @@
-package net.wattpadpremium;
+package net.wattpadpremium.server;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import net.wattpadpremium.Packet;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -11,29 +12,29 @@ import java.io.IOException;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class PlayerStatusPacket implements Packet{
+public class PlayerStatusPacket implements Packet {
 
     public static final int ID = 11;
 
-    private String targetPlayerUsername;
+    private long playerId;
     private STATUS status;
     private boolean enabled;
 
     @Override
-    public int getId() {
+    public int getPacketId() {
         return ID;
     }
 
     @Override
     public void readData(DataInputStream input) throws IOException {
-        targetPlayerUsername = input.readUTF();
+        playerId = input.readLong();
         status = STATUS.values()[input.readInt()];
         enabled = input.readBoolean();
     }
 
     @Override
     public void writeData(DataOutputStream output) throws IOException {
-        output.writeUTF(targetPlayerUsername);
+        output.writeLong(playerId);
         output.writeInt(status.ordinal());
         output.writeBoolean(enabled);
     }

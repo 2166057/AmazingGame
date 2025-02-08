@@ -1,6 +1,10 @@
 package net.wattpadpremium.server;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonElement;
 import net.wattpadpremium.*;
+import net.wattpadpremium.client.AuthSessionPacket;
+import net.wattpadpremium.client.MovePacket;
 import net.wattpadpremium.server.boxes.*;
 
 import java.awt.*;
@@ -13,9 +17,11 @@ public class GameServer implements GameServerAPI{
     public final TCPServer tcpServer;
     private int goalX, goalY;
     private int mazeWidth = 15, mazeHeight = 15;
-    private final HashMap<String , ServerPlayer> allPlayers = new HashMap<>();
+    private final HashMap<Long , ServerPlayer> allPlayers = new HashMap<>();
 
     private final HashMap<UUID, Trap> trapMap = new HashMap<>();
+
+    private boolean onlineMode = true;
 
     private int spawnX = 0,spawnY = 0;
 //    private final HashMap<String , Bot> bots = new HashMap<>();
@@ -29,40 +35,53 @@ public class GameServer implements GameServerAPI{
 
     public GameServer() throws IOException {
         tcpServer = new TCPServer();
-        tcpServer.getServerPacketHandler().put(JoinPacket.ID, (packet, clientHandler) -> {
-            if (matchStarted){
-                return;
-            }
-            JoinPacket joinPacket = (JoinPacket) packet;
-            if (joinPacket.getUsername().length() > 16){
-                return;
-            }
-            ServerPlayer serverPlayer = new ServerPlayer(this, clientHandler, joinPacket.getUsername(), joinPacket.getColor());
-            System.out.println("Player " + joinPacket.getUsername() +  " has joined the game " + allPlayers.size() + "/" + maxPlayerCount);
-            if (allPlayers.size() >= minPlayerSize){
-                beginCountDown();
-            }
-            if (allPlayers.size() == maxPlayerCount){
-                startGame();
-            }
-            allPlayers.forEach((string, player) -> {
-                PlayerCountPacket playerCountPacket = new PlayerCountPacket();
-                playerCountPacket.setCount(allPlayers.size());
-                playerCountPacket.setMax(maxPlayerCount);
-                player.sendPacket(playerCountPacket);
-            });
-        });
+        tcpServer.getServerPacketHandler().put(AuthSessionPacket.ID, ((packet, clientHandler) -> {
+            AuthSessionPacket authSessionPacket = (AuthSessionPacket) packet;
+            try {
+                String jsonString = SessionManager.validateSession(authSessionPacket.getSessionToken(),"*");
+                JsonElement jsonElement = new Gson().fromJson(jsonString, JsonElement.class);
+                String username = onlineMode ? jsonElement.getAsJsonObject().get("username").getAsString() : authSessionPacket.getUsername();
+                long id = onlineMode ? jsonElement.getAsJsonObject().get("Id").getAsLong() : new Random().nextLong();
+                AcceptConnectionPacket acceptConnectionPacket = new AcceptConnectionPacket();
+                acceptConnectionPacket.setUsername(username);
+                acceptConnectionPacket.setPlayerId(id);
 
-        tcpServer.getServerPacketHandler().put(PositionChangePacket.ID, (packet, clientHandler) -> {
+                if (matchStarted){
+                    return;
+                }
+
+                clientHandler.setServerPlayer(new ServerPlayer(this, clientHandler, id, username, Color.orange.getRGB()));
+                clientHandler.getServerPlayer().onConnectMatch();
+                clientHandler.sendPacket(acceptConnectionPacket);
+                System.out.println(acceptConnectionPacket);
+                System.out.println("Player " + clientHandler.getServerPlayer().getUsername() +  " has joined the game " + allPlayers.size() + "/" + maxPlayerCount);
+
+                if (allPlayers.size() >= minPlayerSize){
+                    beginCountDown();
+                }
+                if (allPlayers.size() == maxPlayerCount){
+                    startGame();
+                }
+
+                allPlayers.forEach((string, player) -> {
+                    PlayerCountPacket playerCountPacket = new PlayerCountPacket();
+                    playerCountPacket.setCount(allPlayers.size());
+                    playerCountPacket.setMax(maxPlayerCount);
+                    player.sendPacket(playerCountPacket);
+                });
+            } catch (IOException ignored) {
+
+            }
+        }));
+        tcpServer.getServerPacketHandler().put(MovePacket.ID, (packet, clientHandler) -> {
             ServerPlayer serverPlayer = clientHandler.getServerPlayer();
-            PositionChangePacket positionChangePacket = (PositionChangePacket) packet;
+            MovePacket movePacket = (MovePacket) packet;
             if (serverPlayer != null) {
-                serverPlayer.setX(positionChangePacket.getX());
-                serverPlayer.setY(positionChangePacket.getY());
+                serverPlayer.setX(movePacket.getX());
+                serverPlayer.setY(movePacket.getY());
             }else {
                 return;
             }
-//            System.out.println(positionChangePacket.getUsername() + " moved to " +positionChangePacket.getX() + " _ " + positionChangePacket.getY());
 
             if (serverPlayer.getX() == goalX && serverPlayer.getY() == goalY) {
                 serverPlayer.setScore(serverPlayer.getScore()+1);
@@ -262,11 +281,12 @@ public class GameServer implements GameServerAPI{
     }
 
     public void playerJoinEvent(ServerPlayer serverPlayer) {
-        allPlayers.put(serverPlayer.getUsername(), serverPlayer);
+        allPlayers.put(serverPlayer.getPlayerId(), serverPlayer);
     }
 
     public void playerQuitEvent(ServerPlayer serverPlayer){
-        tcpServer.broadcastPacket(new RemovePlayerPacket(serverPlayer.getUsername()));
+        tcpServer.broadcastPacket(new RemovePlayerPacket(serverPlayer.getPlayerId()));
+        allPlayers.remove(serverPlayer.getPlayerId());
         if (allPlayers.isEmpty()){
             endGame();
         }
@@ -310,7 +330,7 @@ public class GameServer implements GameServerAPI{
 
     @Override
     public ServerPlayer getServerPlayer(String username) {
-        return allPlayers.get(username);
+        return allPlayers.values().stream().filter(serverPlayer -> serverPlayer.getUsername().equalsIgnoreCase(username)).findFirst().get();
     }
 
     @Override
@@ -331,7 +351,7 @@ public class GameServer implements GameServerAPI{
     @Override
     public void notifyPositionChangeToClients(ServerPlayer serverPlayer) {
         PositionChangePacket positionChangePacket = new PositionChangePacket();
-        positionChangePacket.setUsername(serverPlayer.getUsername());
+        positionChangePacket.setPlayerId(serverPlayer.getPlayerId());
         positionChangePacket.setX(serverPlayer.getX());
         positionChangePacket.setY(serverPlayer.getY());
         positionChangePacket.setColor(serverPlayer.getColor());

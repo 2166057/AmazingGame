@@ -1,6 +1,6 @@
 package net.wattpadpremium.server.boxes;
 
-import net.wattpadpremium.PlayerStatusPacket;
+import net.wattpadpremium.server.PlayerStatusPacket;
 import net.wattpadpremium.server.GameServerAPI;
 
 public class BlindnessTrap extends StatusTrap{

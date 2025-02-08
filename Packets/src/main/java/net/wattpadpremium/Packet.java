@@ -1,12 +1,16 @@
 package net.wattpadpremium;
 
+import net.wattpadpremium.client.AuthSessionPacket;
+import net.wattpadpremium.client.MovePacket;
+import net.wattpadpremium.server.*;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
 public interface Packet {
 
-    int getId();
+    int getPacketId();
     void readData(DataInputStream input) throws IOException;
     void writeData(DataOutputStream output) throws IOException;
 
@@ -18,7 +22,7 @@ public interface Packet {
                 packet.readData(payload);
                 return packet;
             case 2:
-                packet = new JoinPacket();
+                packet = new JoinRequestPacket();
                 packet.readData(payload);
                 return packet;
             case 3:
@@ -51,6 +55,18 @@ public interface Packet {
                 return packet;
             case 11:
                 packet = new PlayerStatusPacket();
+                packet.readData(payload);
+                return packet;
+            case 12:
+                packet = new AuthSessionPacket();
+                packet.readData(payload);
+                return packet;
+            case 13:
+                packet = new AcceptConnectionPacket();
+                packet.readData(payload);
+                return packet;
+            case 14:
+                packet = new MovePacket();
                 packet.readData(payload);
                 return packet;
             default:

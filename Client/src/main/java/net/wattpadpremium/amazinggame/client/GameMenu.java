@@ -1,8 +1,5 @@
 package net.wattpadpremium.amazinggame.client;
 
-import javafx.scene.media.Media;
-import javafx.scene.media.MediaPlayer;
-
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -12,9 +9,9 @@ public class GameMenu extends JFrame {
 
     private JPanel mainPanel;
 
-    private final GameInstance gameInstance;
+    private final Game gameInstance;
 
-    public GameMenu(GameInstance gameInstance) {
+    public GameMenu(Game gameInstance) {
         this.gameInstance = gameInstance;
         setTitle("Game Menu");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -40,7 +37,10 @@ public class GameMenu extends JFrame {
 
         exitButton.addActionListener(e -> System.exit(0));
 
-        multiPlayerButton.addActionListener(e -> new MultiplayerMenu(gameInstance,this).setVisible(true));
+        multiPlayerButton.addActionListener(e -> {
+            gameInstance.getMultiplayerMenu().setVisible(true);
+            gameInstance.getMainMenu().setVisible(false);
+        });
 
         mainPanel.add(multiPlayerButton);
         mainPanel.add(colorButton);
@@ -50,9 +50,9 @@ public class GameMenu extends JFrame {
     }
 
     private void showColorSelector() {
-        ColorSelector colorSelector = new ColorSelector(this, gameInstance.getProfile().getColor());
-        gameInstance.getProfile().setColor(colorSelector.getSelectedColor());
-        mainPanel.setBackground(gameInstance.getProfile().getColor());
+        ColorSelector colorSelector = new ColorSelector(this, gameInstance.getGameVariables().getSelectedColor());
+        gameInstance.getGameVariables().setSelectedColor(colorSelector.getSelectedColor());
+        mainPanel.setBackground(gameInstance.getGameVariables().getSelectedColor());
     }
 
 

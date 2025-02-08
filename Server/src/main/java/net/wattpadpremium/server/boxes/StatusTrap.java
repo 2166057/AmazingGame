@@ -1,7 +1,7 @@
 package net.wattpadpremium.server.boxes;
 
 import lombok.Getter;
-import net.wattpadpremium.PlayerStatusPacket;
+import net.wattpadpremium.server.PlayerStatusPacket;
 import net.wattpadpremium.server.GameServerAPI;
 import net.wattpadpremium.server.ServerPlayer;
 

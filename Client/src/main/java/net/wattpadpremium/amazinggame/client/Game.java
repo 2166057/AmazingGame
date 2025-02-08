@@ -1,7 +1,6 @@
 package net.wattpadpremium.amazinggame.client;
 
 import lombok.Getter;
-import lombok.Setter;
 
 
 import javax.sound.sampled.AudioInputStream;
@@ -11,21 +10,35 @@ import java.io.File;
 import java.net.URL;
 
 @Getter
-public class GameInstance {
+public class Game {
 
-    private final Profile profile;
+    private final GameVariables gameVariables;
 
-    @Setter
-    private GameScene mazeGame = null;
+    private final GameMenu mainMenu;
 
-    public GameInstance(Profile profile) {
-        this.profile = profile;
-        new GameMenu(this).setVisible(true);
-        playMP3FromResources("game_song.wav");
+    private final MultiplayerMenu multiplayerMenu;
+
+    private final PlayScene playScene;
+
+
+    public Game(GameVariables gameVariables) {
+        this.gameVariables = gameVariables;
+        this.mainMenu = new GameMenu(this);
+        this.multiplayerMenu = new MultiplayerMenu(this);
+        this.playScene = new PlayScene(this);
+
+        mainMenu.setVisible(true);
+        //playMP3FromResources("game_song.wav");
     }
 
     public static void main(String[] args) {
-        new GameInstance(new Profile());
+        String userToken;
+        if (args.length != 0){
+            userToken = args[0];
+            GameVariables gameVariables = new GameVariables();
+            gameVariables.setUserToken(userToken);
+            new Game(gameVariables);
+        }
     }
 
     private void playMP3FromResources(String filename) {
@@ -35,24 +48,16 @@ public class GameInstance {
                 System.out.println("MP3 file not found: " + filename);
                 return;
             }
-
-            System.out.println(songUrl.getPath());
-
             AudioInputStream audioInputStream = AudioSystem.getAudioInputStream(new File(songUrl.getPath()).getAbsoluteFile());
-
             Clip clip = AudioSystem.getClip();
-
             clip.open(audioInputStream);
-
             clip.loop(Clip.LOOP_CONTINUOUSLY);
-
             clip.start();
-
-
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
+
 
 
 }

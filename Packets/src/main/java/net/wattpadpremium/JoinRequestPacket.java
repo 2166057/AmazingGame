@@ -1,34 +1,32 @@
 package net.wattpadpremium;
 
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-@Data
-public class PlayerCountPacket implements Packet {
+@Setter
+@Getter
+public class JoinRequestPacket implements Packet {
 
-    public static final int ID = 7;
+    public static final int ID = 2;
 
-    private int count = 0;
-    private int max = 0;
+    private int color;
 
     @Override
-    public int getId() {
+    public int getPacketId() {
         return ID;
     }
 
     @Override
     public void readData(DataInputStream input) throws IOException {
-        count = input.readInt();
-        max = input.readInt();
+        this.color = input.readInt();
     }
 
     @Override
     public void writeData(DataOutputStream output) throws IOException {
-        output.writeInt(count);
-        output.writeInt(max);
+        output.writeInt(color);
     }
-
 }
