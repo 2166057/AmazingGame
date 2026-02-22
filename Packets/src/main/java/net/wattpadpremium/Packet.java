@@ -1,6 +1,7 @@
 package net.wattpadpremium;
 
 import net.wattpadpremium.client.AuthSessionPacket;
+import net.wattpadpremium.client.JoinRequestPacket;
 import net.wattpadpremium.client.MovePacket;
 import net.wattpadpremium.server.*;
 

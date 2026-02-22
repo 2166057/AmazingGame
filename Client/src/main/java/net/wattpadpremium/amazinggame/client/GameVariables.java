@@ -7,6 +7,8 @@ import java.awt.*;
 @Data
 public class GameVariables {
 
+    private Boolean onlineMode;
+
     private String userToken;
 
     private String username;

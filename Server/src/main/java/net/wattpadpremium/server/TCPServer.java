@@ -9,29 +9,32 @@ import java.io.*;
 import java.net.*;
 import java.util.*;
 
-public class TCPServer {
+public class TCPServer extends AbstractTCPServer{
 
-    private static final int SERVER_PORT = 12345;
+    private final int serverPort;
     private final ServerSocket serverSocket;
+
+    @Getter
     private final List<ClientHandler> clientHandlers = new ArrayList<>();
 
     @Getter
     private final ServerPacketHandler serverPacketHandler;
 
-    public TCPServer() throws IOException {
-        serverSocket = new ServerSocket(SERVER_PORT);
+    public TCPServer(int port) throws IOException {
+        this.serverPort = port;
+        serverSocket = new ServerSocket(serverPort);
         serverPacketHandler = new ServerPacketHandler();
     }
 
     public void startServer() {
-        System.out.println("Server started on port " + SERVER_PORT);
+        System.out.println("Server started on port " + serverPort);
         try {
             while (true) {
                 Socket clientSocket = serverSocket.accept();
                 System.out.println("Client connected: " + clientSocket.getInetAddress());
 
                 ClientHandler clientHandler = new ClientHandler(clientSocket, this);
-                clientHandlers.add(clientHandler);
+                getClientHandlers().add(clientHandler);
                 new Thread(clientHandler).start();
             }
         } catch (IOException e) {
@@ -39,66 +42,5 @@ public class TCPServer {
         }
     }
 
-    public void broadcastPacket(Packet packet) {
-        synchronized (clientHandlers){
-            for (ClientHandler clientHandler : clientHandlers) {
-                clientHandler.sendPacket(packet);
-            }
-        }
-    }
 
-    public static class ClientHandler implements Runnable {
-        private final Socket clientSocket;
-        private final TCPServer tcpServer;
-
-        @Setter
-        @Getter
-        private ServerPlayer serverPlayer;
-
-        public ClientHandler(Socket socket, TCPServer tcpServer) {
-            this.clientSocket = socket;
-            this.tcpServer = tcpServer;
-        }
-
-        @Override
-        public void run() {
-            try {
-                DataInputStream in = new DataInputStream(clientSocket.getInputStream());
-                while (true) {
-                    try {
-                        tcpServer.serverPacketHandler.handlePacket(in, this);
-                    } catch (IOException e) {
-                        System.err.println("Error reading packet: " + e.getMessage());
-                        break;
-                    }
-                }
-            } catch (IOException e) {
-                System.err.println("Client connection error: " + e.getMessage());
-            } finally {
-                try {
-                    clientSocket.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                tcpServer.clientHandlers.remove(this);
-                if (getServerPlayer() != null){
-                    getServerPlayer().onDisconnect();
-                }
-                System.out.println("Client disconnected: " + clientSocket.getInetAddress());
-            }
-        }
-
-        public void sendPacket(Packet packet) {
-            try {
-                DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream());
-                out.writeInt(packet.getPacketId());
-                packet.writeData(out);
-//                System.out.println("Sending Packet: " + packet);
-                out.flush();
-            } catch (IOException e) {
-                System.err.println("Error sending packet: " + e.getMessage());
-            }
-        }
-
-    }
 }

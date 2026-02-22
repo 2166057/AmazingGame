@@ -4,7 +4,10 @@ import lombok.Getter;
 import lombok.Setter;
 import net.wattpadpremium.Packet;
 
+
 public class ServerPlayer {
+
+    private final AbstractGameServer gameServer;
 
     @Getter
     private final String username;
@@ -20,35 +23,33 @@ public class ServerPlayer {
     @Getter
     private final Long playerId;
 
-    private final TCPServer.ClientHandler clientHandler;
-    private final GameServer gameServer;
+    private final IClientHandler clientHandler;
 
-    public ServerPlayer(GameServer gameServer, TCPServer.ClientHandler clientHandler, Long id, String username, int color) {
+    public ServerPlayer(AbstractGameServer abstractGameServer, IClientHandler clientHandler, Long id, String username, int color) {
+        this.gameServer = abstractGameServer;
         this.clientHandler = clientHandler;
-        this.gameServer = gameServer;
         this.username = username;
         this.color = color;
         this.playerId = id;
-        clientHandler.setServerPlayer(this);
-    }
-
-    public void onConnectMatch(){
-        gameServer.playerJoinEvent(this);
     }
 
     public void setStatus(PlayerStatusPacket.STATUS status, boolean enabled){
         PlayerStatusPacket playerStatusPacket = new PlayerStatusPacket(getPlayerId(), status, enabled);
-        sendPacket(playerStatusPacket);
+        sendPacketToClient(playerStatusPacket);
     }
 
     public void setScore(int score){
         this.score = score;
         PlayerScorePacket playerScorePacket = new PlayerScorePacket(getPlayerId(), score);
-        gameServer.tcpServer.broadcastPacket(playerScorePacket);
+        gameServer.getTcpServer().broadcastPacket(playerScorePacket);
     }
 
-    public void sendPacket(Packet packet){
-        clientHandler.sendPacket(packet);
+    public void sendPacketToClient(Packet packet){
+        clientHandler.sendPacketToClient(packet);
+    }
+
+    public void onConnectMatch(){
+        gameServer.playerJoinEvent(this);
     }
 
     public void onDisconnect(){

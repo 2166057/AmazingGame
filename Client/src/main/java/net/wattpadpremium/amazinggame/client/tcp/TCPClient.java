@@ -1,26 +1,21 @@
-package net.wattpadpremium.amazinggame.client;
+package net.wattpadpremium.amazinggame.client.tcp;
 
 import lombok.Getter;
 import net.wattpadpremium.Packet;
 import net.wattpadpremium.PacketHandler;
-import net.wattpadpremium.client.JoinRequestPacket;
-import net.wattpadpremium.server.*;
 
-import java.awt.*;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-public class TCPClient {
+public class TCPClient extends AbstractTCPClient {
 
     private final Socket socket;
 
     @Getter
     private final PacketHandler packetHandler;
-
 
     public TCPClient(String serverAddress, int port) throws IOException {
         socket = new Socket(serverAddress, port);
@@ -28,25 +23,17 @@ public class TCPClient {
         new Thread(this::listenForPackets).start();
     }
 
-    public void sendPacket(Packet packet) {
-        CompletableFuture.runAsync(()->{
-            try {
-                DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-                out.writeInt(packet.getPacketId());
-                packet.writeData(out);
-                System.out.println("Sending Packet: " + packet);
-                out.flush();
-            } catch (IOException e) {
-                System.err.println("Error sending packet: " + e.getMessage());
-            }
-        });
-    }
 
     public void listenForPackets() {
         try {
             while (true) {
                 try {
-                    packetHandler.handlePacket(new DataInputStream(socket.getInputStream()));
+                    Packet packet = getPacketHandler().readPacket(new DataInputStream(socket.getInputStream()));
+                    if (packet != null && getPacketHandler().containsKey(packet.getPacketId())) {
+                        getPacketHandler().get(packet.getPacketId()).handlePacket(packet);
+                    } else {
+                        System.err.println("Unknown packet ID: " + packet.getPacketId());
+                    }
                 } catch (IOException e) {
                     System.err.println("Error reading packet: " + e.getMessage());
                     break;
@@ -65,4 +52,18 @@ public class TCPClient {
         }
     }
 
+    @Override
+    public void sendPacketToServer(Packet packet) {
+        CompletableFuture.runAsync(()->{
+            try {
+                DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+                out.writeInt(packet.getPacketId());
+                packet.writeData(out);
+                System.out.println("Sending Packet: " + packet);
+                out.flush();
+            } catch (IOException e) {
+                System.err.println("Error sending packet: " + e.getMessage());
+            }
+        });
+    }
 }

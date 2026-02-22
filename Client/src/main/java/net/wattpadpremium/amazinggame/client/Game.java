@@ -6,8 +6,10 @@ import lombok.Getter;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.Clip;
+import java.awt.*;
 import java.io.File;
 import java.net.URL;
+import java.util.UUID;
 
 @Getter
 public class Game {
@@ -20,7 +22,6 @@ public class Game {
 
     private final PlayScene playScene;
 
-
     public Game(GameVariables gameVariables) {
         this.gameVariables = gameVariables;
         this.mainMenu = new GameMenu(this);
@@ -31,14 +32,22 @@ public class Game {
         //playMP3FromResources("game_song.wav");
     }
 
-    public static void main(String[] args) {
-        String userToken;
+    static void main(String[] args) {
+        GameVariables gameVariables = new GameVariables();
         if (args.length != 0){
-            userToken = args[0];
-            GameVariables gameVariables = new GameVariables();
+            String userToken = args[0];
+            //todo implement username retrieval
+            gameVariables.setUsername("Online");
             gameVariables.setUserToken(userToken);
-            new Game(gameVariables);
+            gameVariables.setOnlineMode(true);
+            gameVariables.setSelectedColor(new Color(250, 50, 50));
+        }else {
+            gameVariables.setUserToken("");
+            gameVariables.setUsername(UUID.randomUUID().toString().split("-")[0]);
+            gameVariables.setOnlineMode(false);
+            gameVariables.setSelectedColor(Color.MAGENTA);
         }
+        new Game(gameVariables);
     }
 
     private void playMP3FromResources(String filename) {

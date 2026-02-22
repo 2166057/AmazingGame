@@ -1,10 +1,14 @@
 package net.wattpadpremium.amazinggame.client;
 
 import net.wattpadpremium.SessionManager;
+import net.wattpadpremium.amazinggame.client.tcp.AbstractTCPClient;
+import net.wattpadpremium.amazinggame.client.tcp.SocketLessTCPClient;
+import net.wattpadpremium.amazinggame.client.tcp.TCPClient;
 import net.wattpadpremium.client.AuthSessionPacket;
-import net.wattpadpremium.client.JoinRequestPacket;
 import net.wattpadpremium.client.MovePacket;
 import net.wattpadpremium.server.*;
+import net.wattpadpremium.server.socketless.SocketLessClientHandler;
+import net.wattpadpremium.server.socketless.SocketLessTCPServer;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
@@ -22,7 +26,7 @@ public class PlayScene extends JFrame {
 
     private final Game game;
     private Player localPlayer;
-    private TCPClient tcpClient;
+    private AbstractTCPClient tcpClient;
 
     private int localPosX = 0, localPosY = 0;
     private final HashMap<Long, Player> otherPlayers = new HashMap<>();
@@ -48,82 +52,118 @@ public class PlayScene extends JFrame {
     private int score = 0;
 
 
+    public void joinSinglePlayer() {
+        try {
+            var fakeServerSocket = new SocketLessTCPServer();
+            var server = new GameServer(1,1, false, fakeServerSocket);
+            var client = new SocketLessTCPClient();
+            SocketLessClientHandler socketLessIClientHandler = client.requestSocketLessClientHandler(fakeServerSocket);
+            configureClientPacketListener(client);
+            this.tcpClient = client;
+
+            AuthSessionPacket authSessionPacket = new AuthSessionPacket();
+            if (game.getGameVariables().getOnlineMode()){
+                String sessionToken = SessionManager.createUserSessionToken(game.getGameVariables().getUserToken(), "-");
+                authSessionPacket.setUsername(game.getGameVariables().getUsername());
+                authSessionPacket.setSessionToken(sessionToken);
+            }else {
+                authSessionPacket.setUsername(game.getGameVariables().getUsername());
+                authSessionPacket.setSessionToken(UUID.randomUUID().toString());
+            }
+
+            tcpClient.sendPacketToServer(authSessionPacket);
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+
+
+
     public void joinServer(String address, int port){
         try {
-            tcpClient = new TCPClient(address, port);
+            var client = new TCPClient(address, port);
+            this.tcpClient = client;
+
+            configureClientPacketListener(client);
+            //setupPacketListener
             AuthSessionPacket authSessionPacket = new AuthSessionPacket();
             String sessionToken = SessionManager.createUserSessionToken(game.getGameVariables().getUserToken(), address);
             authSessionPacket.setSessionToken(sessionToken);
 
-            //setupPacketListener
-            tcpClient.getPacketHandler().put(AcceptConnectionPacket.ID, (packet -> {
-                AcceptConnectionPacket acceptConnectionPacket = (AcceptConnectionPacket) packet;
-
-                localPlayer = new Player();
-                localPlayer.setUsername(acceptConnectionPacket.getUsername());
-                localPlayer.setPlayerId(acceptConnectionPacket.getPlayerId());
-
-                game.getPlayScene().setVisible(true);
-                game.getMultiplayerMenu().setVisible(false);
-
-                startTicking();
-            }));
-            tcpClient.getPacketHandler().put(MazePacket.ID, (packet)->{
-                MazePacket mazePacket = (MazePacket) packet;
-                updateMaze(mazePacket);
-            });
-            tcpClient.getPacketHandler().put(PositionChangePacket.ID, (packet) -> {
-                PositionChangePacket positionChangePacket = (PositionChangePacket) packet;
-
-                System.out.println("Received position changed "+packet);
-
-                if (positionChangePacket.getPlayerId() == localPlayer.getPlayerId()){
-                    setLocalePosition(positionChangePacket.getX(), positionChangePacket.getY());
-                }else {
-                    setSpecificPlayerPos(positionChangePacket.getPlayerId(), positionChangePacket.getX(), positionChangePacket.getY());
-                    changeSpecificPlayerColor(positionChangePacket.getPlayerId(), positionChangePacket.getColor());
-                }
-            });
-            tcpClient.getPacketHandler().put(RemovePlayerPacket.ID, (packet) -> {
-                RemovePlayerPacket removePlayerPacket = (RemovePlayerPacket) packet;
-                removePlayer(removePlayerPacket.getPlayedId());
-            });
-            tcpClient.getPacketHandler().put(PlayerScorePacket.ID, (packet) -> {
-                PlayerScorePacket playerScorePacket = (PlayerScorePacket) packet;
-                if (playerScorePacket.getPlayerId() == localPlayer.getPlayerId()){
-                    setMyScore(playerScorePacket.getScore());
-                }else {
-                    changeSpecificPlayerScore(playerScorePacket.getPlayerId(), playerScorePacket.getScore());
-                }
-            });
-            tcpClient.getPacketHandler().put(EndGamePacket.ID, (packet) -> {
-                EndGamePacket endGamePacket = (EndGamePacket) packet;
-                endGame();
-            });
-            tcpClient.getPacketHandler().put(PlayerCountPacket.ID, packet -> {
-                PlayerCountPacket playerCountPacket = (PlayerCountPacket) packet;
-//            playerLabel.setText("Waiting for players "+playerCountPacket.getCount() + "/" + playerCountPacket.getMax());
-            });
-            tcpClient.getPacketHandler().put(TrapPacket.ID, packet -> {
-                TrapPacket trapPacket = (TrapPacket) packet;
-                UUID drawUUID = UUID.fromString(trapPacket.getTrapID());
-                if (trapPacket.isDelete()){
-                    removeDrawable(drawUUID);
-                }else {
-                    addDrawable(new ClientObject(trapPacket.getPosX(), trapPacket.getPosY(), new Color(trapPacket.getColor()), UUID.fromString(trapPacket.getTrapID())));
-                }
-            });
-            tcpClient.getPacketHandler().put(PlayerStatusPacket.ID, packet -> {
-                PlayerStatusPacket playerStatusPacket = (PlayerStatusPacket) packet;
-                if (localPlayer.getPlayerId() == playerStatusPacket.getPlayerId()){
-                    setLocalePlayerStatus(playerStatusPacket.getStatus(), playerStatusPacket.isEnabled());
-                }
-            });
-            tcpClient.sendPacket(authSessionPacket);
+            tcpClient.sendPacketToServer(authSessionPacket);
         } catch (IOException | InterruptedException ignored) {
 
         }
     }
+
+
+    private void configureClientPacketListener(AbstractTCPClient client) {
+        client.getPacketHandler().put(AcceptConnectionPacket.ID, (packet -> {
+            AcceptConnectionPacket acceptConnectionPacket = (AcceptConnectionPacket) packet;
+
+            localPlayer = new Player();
+
+            localPlayer.setUsername(acceptConnectionPacket.getUsername());
+            localPlayer.setPlayerId(acceptConnectionPacket.getPlayerId());
+
+            game.getPlayScene().setVisible(true);
+            game.getMultiplayerMenu().setVisible(false);
+
+            startTicking();
+        }));
+        client.getPacketHandler().put(MazePacket.ID, (packet)->{
+            MazePacket mazePacket = (MazePacket) packet;
+            updateMaze(mazePacket);
+        });
+        client.getPacketHandler().put(PositionChangePacket.ID, (packet) -> {
+            PositionChangePacket positionChangePacket = (PositionChangePacket) packet;
+
+            System.out.println("Received position changed "+packet);
+
+            if (positionChangePacket.getPlayerId() == localPlayer.getPlayerId()){
+                setLocalePosition(positionChangePacket.getX(), positionChangePacket.getY());
+            }else {
+                setSpecificPlayerPos(positionChangePacket.getPlayerId(), positionChangePacket.getX(), positionChangePacket.getY());
+                changeSpecificPlayerColor(positionChangePacket.getPlayerId(), positionChangePacket.getColor());
+            }
+        });
+        client.getPacketHandler().put(RemovePlayerPacket.ID, (packet) -> {
+            RemovePlayerPacket removePlayerPacket = (RemovePlayerPacket) packet;
+            removePlayer(removePlayerPacket.getPlayedId());
+        });
+        client.getPacketHandler().put(PlayerScorePacket.ID, (packet) -> {
+            PlayerScorePacket playerScorePacket = (PlayerScorePacket) packet;
+            if (playerScorePacket.getPlayerId() == localPlayer.getPlayerId()){
+                setMyScore(playerScorePacket.getScore());
+            }else {
+                changeSpecificPlayerScore(playerScorePacket.getPlayerId(), playerScorePacket.getScore());
+            }
+        });
+        client.getPacketHandler().put(EndGamePacket.ID, (packet) -> {
+            EndGamePacket endGamePacket = (EndGamePacket) packet;
+            endGame();
+        });
+        client.getPacketHandler().put(PlayerCountPacket.ID, packet -> {
+            PlayerCountPacket playerCountPacket = (PlayerCountPacket) packet;
+//            playerLabel.setText("Waiting for players "+playerCountPacket.getCount() + "/" + playerCountPacket.getMax());
+        });
+        client.getPacketHandler().put(TrapPacket.ID, packet -> {
+            TrapPacket trapPacket = (TrapPacket) packet;
+            UUID drawUUID = UUID.fromString(trapPacket.getTrapID());
+            if (trapPacket.isDelete()){
+                removeDrawable(drawUUID);
+            }else {
+                addDrawable(new ClientObject(trapPacket.getPosX(), trapPacket.getPosY(), new Color(trapPacket.getColor()), UUID.fromString(trapPacket.getTrapID())));
+            }
+        });
+        client.getPacketHandler().put(PlayerStatusPacket.ID, packet -> {
+            PlayerStatusPacket playerStatusPacket = (PlayerStatusPacket) packet;
+            if (localPlayer.getPlayerId() == playerStatusPacket.getPlayerId()){
+                setLocalePlayerStatus(playerStatusPacket.getStatus(), playerStatusPacket.isEnabled());
+            }
+        });
+    }
+
 
     public PlayScene(Game game) {
         this.game = game;
@@ -450,7 +490,7 @@ public class PlayScene extends JFrame {
         MovePacket packet = new MovePacket();
         packet.setY(localPosY);
         packet.setX(localPosX);
-        tcpClient.sendPacket(packet);
+        tcpClient.sendPacketToServer(packet);
     }
 
     public void endGame(){

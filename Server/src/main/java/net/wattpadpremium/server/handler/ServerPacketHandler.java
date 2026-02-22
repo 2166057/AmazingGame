@@ -1,6 +1,7 @@
 package net.wattpadpremium.server.handler;
 
 import net.wattpadpremium.*;
+import net.wattpadpremium.server.IClientHandler;
 import net.wattpadpremium.server.TCPServer;
 
 import java.io.DataInputStream;
@@ -9,17 +10,9 @@ import java.util.HashMap;
 
 public class ServerPacketHandler extends HashMap<Integer, ServerPacketListener> {
 
-    public void handlePacket(DataInputStream input, TCPServer.ClientHandler clientHandler) throws IOException {
+    public Packet readPacket(DataInputStream input) throws IOException {
         int packetId = input.readInt();
-
-        Packet packet = Packet.createPacket(packetId, input);
-        if (packet != null && containsKey(packetId)) {
-            get(packetId).handlePacket(packet, clientHandler);
-        } else {
-            System.err.println("Unknown packet ID: " + packetId);
-        }
+        return Packet.createPacket(packetId, input);
     }
-
-
 
 }

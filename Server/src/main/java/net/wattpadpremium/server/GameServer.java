@@ -12,37 +12,49 @@ import java.io.IOException;
 import java.util.*;
 import java.util.List;
 
-public class GameServer implements GameServerAPI{
+public class GameServer extends AbstractGameServer implements GameServerAPI {
 
-    public final TCPServer tcpServer;
     private int goalX, goalY;
     private int mazeWidth = 15, mazeHeight = 15;
     private final HashMap<Long , ServerPlayer> allPlayers = new HashMap<>();
 
     private final HashMap<UUID, Trap> trapMap = new HashMap<>();
 
-    private boolean onlineMode = true;
+    private final boolean onlineMode;
 
     private int spawnX = 0,spawnY = 0;
 //    private final HashMap<String , Bot> bots = new HashMap<>();
 
     private int[][] maze;
-    private final int maxPlayerCount = 3;
-    private final int minPlayerSize = 1;
+    private final int maxPlayerCount;
+    private final int minPlayerSize;
 //    private int numberOfBots = 1;
 
     private boolean matchStarted = false;
 
     public GameServer() throws IOException {
-        tcpServer = new TCPServer();
-        tcpServer.getServerPacketHandler().put(AuthSessionPacket.ID, ((packet, clientHandler) -> {
+        this(3,1, true, new TCPServer(12345));
+    }
+
+    public GameServer(int maxPlayerCount, int minPlayerSize, boolean onlineMode, AbstractTCPServer tcpServer) {
+        super(tcpServer);
+        this.onlineMode = onlineMode;
+        this.maxPlayerCount = maxPlayerCount;
+        this.minPlayerSize = minPlayerSize;
+        getTcpServer().getServerPacketHandler().put(AuthSessionPacket.ID, ((packet, clientHandler) -> {
             AuthSessionPacket authSessionPacket = (AuthSessionPacket) packet;
             try {
-                String jsonString = SessionManager.validateSession(authSessionPacket.getSessionToken(),"*");
-                JsonElement jsonElement = new Gson().fromJson(jsonString, JsonElement.class);
-                String username = onlineMode ? jsonElement.getAsJsonObject().get("username").getAsString() : authSessionPacket.getUsername();
-                long id = onlineMode ? jsonElement.getAsJsonObject().get("Id").getAsLong() : new Random().nextLong();
                 AcceptConnectionPacket acceptConnectionPacket = new AcceptConnectionPacket();
+
+                String jsonString = null;
+                JsonElement jsonElement= null;
+                if (onlineMode){
+                    jsonString = SessionManager.validateSession(authSessionPacket.getSessionToken(),"*");
+                    jsonElement = new Gson().fromJson(jsonString, JsonElement.class);
+                }
+
+                String username = this.onlineMode ? jsonElement.getAsJsonObject().get("username").getAsString() : authSessionPacket.getUsername();
+                long id = this.onlineMode ? jsonElement.getAsJsonObject().get("Id").getAsLong() : new Random().nextLong();
                 acceptConnectionPacket.setUsername(username);
                 acceptConnectionPacket.setPlayerId(id);
 
@@ -52,7 +64,7 @@ public class GameServer implements GameServerAPI{
 
                 clientHandler.setServerPlayer(new ServerPlayer(this, clientHandler, id, username, Color.orange.getRGB()));
                 clientHandler.getServerPlayer().onConnectMatch();
-                clientHandler.sendPacket(acceptConnectionPacket);
+                clientHandler.sendPacketToClient(acceptConnectionPacket);
                 System.out.println(acceptConnectionPacket);
                 System.out.println("Player " + clientHandler.getServerPlayer().getUsername() +  " has joined the game " + allPlayers.size() + "/" + maxPlayerCount);
 
@@ -67,13 +79,13 @@ public class GameServer implements GameServerAPI{
                     PlayerCountPacket playerCountPacket = new PlayerCountPacket();
                     playerCountPacket.setCount(allPlayers.size());
                     playerCountPacket.setMax(maxPlayerCount);
-                    player.sendPacket(playerCountPacket);
+                    player.sendPacketToClient(playerCountPacket);
                 });
-            } catch (IOException ignored) {
-
+            } catch (IOException e) {
+                e.printStackTrace();
             }
         }));
-        tcpServer.getServerPacketHandler().put(MovePacket.ID, (packet, clientHandler) -> {
+        getTcpServer().getServerPacketHandler().put(MovePacket.ID, (packet, clientHandler) -> {
             ServerPlayer serverPlayer = clientHandler.getServerPlayer();
             MovePacket movePacket = (MovePacket) packet;
             if (serverPlayer != null) {
@@ -103,13 +115,11 @@ public class GameServer implements GameServerAPI{
                 }
             });
 
-            trapsToRemove.forEach(uuid -> {
-                removeTrap(trapMap.get(uuid));
-            });
+            trapsToRemove.forEach(uuid -> removeTrap(trapMap.get(uuid)));
 
             broadcastPositionsToAll();
         });
-        tcpServer.startServer();
+        getTcpServer().startServer();
     }
 
     private void beginCountDown() {
@@ -141,10 +151,10 @@ public class GameServer implements GameServerAPI{
         mazePacket.setMaze(maze);
         mazePacket.setGoalY(goalY);
         mazePacket.setGoalX(goalX);
-        tcpServer.broadcastPacket(mazePacket);
+        getTcpServer().broadcastPacket(mazePacket);
     }
 
-    public static void main(String[] args) throws IOException {
+    static void main(String[] args) throws IOException {
         new GameServer();
     }
 
@@ -280,12 +290,13 @@ public class GameServer implements GameServerAPI{
         return array;
     }
 
+    @Override
     public void playerJoinEvent(ServerPlayer serverPlayer) {
         allPlayers.put(serverPlayer.getPlayerId(), serverPlayer);
     }
 
     public void playerQuitEvent(ServerPlayer serverPlayer){
-        tcpServer.broadcastPacket(new RemovePlayerPacket(serverPlayer.getPlayerId()));
+        getTcpServer().broadcastPacket(new RemovePlayerPacket(serverPlayer.getPlayerId()));
         allPlayers.remove(serverPlayer.getPlayerId());
         if (allPlayers.isEmpty()){
             endGame();
@@ -310,7 +321,7 @@ public class GameServer implements GameServerAPI{
 
     private void endGame() {
         matchStarted = false;
-        tcpServer.broadcastPacket(new EndGamePacket());
+        getTcpServer().broadcastPacket(new EndGamePacket());
     }
 
     @Override
@@ -355,7 +366,7 @@ public class GameServer implements GameServerAPI{
         positionChangePacket.setX(serverPlayer.getX());
         positionChangePacket.setY(serverPlayer.getY());
         positionChangePacket.setColor(serverPlayer.getColor());
-        tcpServer.broadcastPacket(positionChangePacket);
+        getTcpServer().broadcastPacket(positionChangePacket);
     }
 
     public void onVisibilityChange(Trap trap) {
@@ -365,7 +376,7 @@ public class GameServer implements GameServerAPI{
         }else {
             trapPacket = new TrapPacket(trap.getTrapUUID().toString(), trap.getPosX(), trap.getPosY(), Color.ORANGE.getRGB(), true);
         }
-        tcpServer.broadcastPacket(trapPacket);
+        getTcpServer().broadcastPacket(trapPacket);
     }
 
     @Override

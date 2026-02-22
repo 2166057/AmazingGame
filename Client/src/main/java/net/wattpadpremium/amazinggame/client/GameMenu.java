@@ -22,9 +22,13 @@ public class GameMenu extends JFrame {
 
     private void initComponents() {
         mainPanel = new JPanel();
-        mainPanel.setLayout(new GridLayout(3, 1));
+        mainPanel.setLayout(new GridLayout(2, 2));
 
+        JButton singlePlayerButton = new JButton("Single Player");
         JButton multiPlayerButton = new JButton("Multiplayer");
+        if (!gameInstance.getGameVariables().getOnlineMode()){
+            multiPlayerButton.setEnabled(false);
+        }
         JButton colorButton = new JButton("Choose Player Color");
         JButton exitButton = new JButton("Exit");
 
@@ -42,6 +46,12 @@ public class GameMenu extends JFrame {
             gameInstance.getMainMenu().setVisible(false);
         });
 
+        singlePlayerButton.addActionListener(e->{
+            gameInstance.getMainMenu().setVisible(false);
+            gameInstance.getPlayScene().joinSinglePlayer();
+        });
+
+        mainPanel.add(singlePlayerButton);
         mainPanel.add(multiPlayerButton);
         mainPanel.add(colorButton);
         mainPanel.add(exitButton);
