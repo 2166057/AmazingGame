@@ -6,6 +6,7 @@ import net.wattpadpremium.*;
 import net.wattpadpremium.client.AuthSessionPacket;
 import net.wattpadpremium.client.MovePacket;
 import net.wattpadpremium.server.boxes.*;
+import net.wattpadpremium.server.modes.GameMode;
 
 import java.awt.*;
 import java.io.IOException;
@@ -13,6 +14,10 @@ import java.util.*;
 import java.util.List;
 
 public class GameServer extends AbstractGameServer implements GameServerAPI {
+
+    private ExtendableTimer timer;
+
+    private final GameMode gameMode;
 
     private int goalX, goalY;
     private int mazeWidth = 15, mazeHeight = 15;
@@ -23,24 +28,25 @@ public class GameServer extends AbstractGameServer implements GameServerAPI {
     private final boolean onlineMode;
 
     private int spawnX = 0,spawnY = 0;
-//    private final HashMap<String , Bot> bots = new HashMap<>();
 
     private int[][] maze;
-    private final int maxPlayerCount;
-    private final int minPlayerSize;
-//    private int numberOfBots = 1;
 
     private boolean matchStarted = false;
 
+    private boolean preventMovement = true;
+
     public GameServer() throws IOException {
-        this(3,1, true, new TCPServer(12345));
+        this(GameMode.SCORELIMIT);
     }
 
-    public GameServer(int maxPlayerCount, int minPlayerSize, boolean onlineMode, AbstractTCPServer tcpServer) {
+    public GameServer(GameMode gameMode) throws IOException {
+        this(gameMode,false, new TCPServer(12345));
+    }
+
+    public GameServer(GameMode mode, boolean onlineMode, AbstractTCPServer tcpServer) {
         super(tcpServer);
+        this.gameMode = mode;
         this.onlineMode = onlineMode;
-        this.maxPlayerCount = maxPlayerCount;
-        this.minPlayerSize = minPlayerSize;
         getTcpServer().getServerPacketHandler().put(AuthSessionPacket.ID, ((packet, clientHandler) -> {
             AuthSessionPacket authSessionPacket = (AuthSessionPacket) packet;
             try {
@@ -66,19 +72,19 @@ public class GameServer extends AbstractGameServer implements GameServerAPI {
                 clientHandler.getServerPlayer().onConnectMatch();
                 clientHandler.sendPacketToClient(acceptConnectionPacket);
                 System.out.println(acceptConnectionPacket);
-                System.out.println("Player " + clientHandler.getServerPlayer().getUsername() +  " has joined the game " + allPlayers.size() + "/" + maxPlayerCount);
+                System.out.println("Player " + clientHandler.getServerPlayer().getUsername() +  " has joined the game " + allPlayers.size() + "/" + gameMode.getMaxPlayer());
 
-                if (allPlayers.size() >= minPlayerSize){
+                if (allPlayers.size() >= gameMode.getMinPlayer()){
                     beginCountDown();
                 }
-                if (allPlayers.size() == maxPlayerCount){
+                if (allPlayers.size() == gameMode.getMaxPlayer()){
                     startGame();
                 }
 
                 allPlayers.forEach((string, player) -> {
                     PlayerCountPacket playerCountPacket = new PlayerCountPacket();
                     playerCountPacket.setCount(allPlayers.size());
-                    playerCountPacket.setMax(maxPlayerCount);
+                    playerCountPacket.setMax(gameMode.getMaxPlayer());
                     player.sendPacketToClient(playerCountPacket);
                 });
             } catch (IOException e) {
@@ -88,7 +94,12 @@ public class GameServer extends AbstractGameServer implements GameServerAPI {
         getTcpServer().getServerPacketHandler().put(MovePacket.ID, (packet, clientHandler) -> {
             ServerPlayer serverPlayer = clientHandler.getServerPlayer();
             MovePacket movePacket = (MovePacket) packet;
+
             if (serverPlayer != null) {
+                if (preventMovement){
+                    clientHandler.sendPacketToClient(new PositionChangePacket(serverPlayer.getPlayerId(), serverPlayer.getX(),serverPlayer.getY(), serverPlayer.getColor()));
+                    return;
+                }
                 serverPlayer.setX(movePacket.getX());
                 serverPlayer.setY(movePacket.getY());
             }else {
@@ -97,6 +108,16 @@ public class GameServer extends AbstractGameServer implements GameServerAPI {
 
             if (serverPlayer.getX() == goalX && serverPlayer.getY() == goalY) {
                 serverPlayer.setScore(serverPlayer.getScore()+1);
+                if (GameMode.TIMER == gameMode){
+                    timer.addSeconds(10);
+                }
+                if (GameMode.SCORELIMIT == gameMode && serverPlayer.getScore() == 2) {
+                    var textOverlayPacket = new TextOverlayPacket(serverPlayer.getUsername() + " has won the game!", 3000);
+                    getTcpServer().broadcastPacket(textOverlayPacket);
+                    endGame();
+                    return;
+                }
+
                 mazeWidth += 2;
                 mazeHeight += 2;
                 generateMap();
@@ -127,9 +148,12 @@ public class GameServer extends AbstractGameServer implements GameServerAPI {
             try {
                 for (int i = 5; i > 0; i--) {
                     System.out.println("Game starts in " + i + " seconds...");
-                    Thread.sleep(1000);
+                    if (!matchStarted){
+                        getTcpServer().broadcastPacket(new TextOverlayPacket("Waiting for players " + i + "s", 1000));
+                        Thread.sleep(1000);
+                    }
                 }
-                if (allPlayers.size() >= minPlayerSize && allPlayers.size() <= maxPlayerCount) {
+                if (allPlayers.size() >= gameMode.getMinPlayer() && allPlayers.size() <= gameMode.getMaxPlayer()) {
                     startGame();
                 } else {
                     System.out.println("Player count is not within range. Game cannot start.");
@@ -154,25 +178,24 @@ public class GameServer extends AbstractGameServer implements GameServerAPI {
         getTcpServer().broadcastPacket(mazePacket);
     }
 
-    static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException {
         new GameServer();
     }
 
 
     private void generateMap() {
+        long start = System.nanoTime();
+
         Random random = new Random();
         generateMazeUsingRecursiveBacktracking();
 
         do {
             spawnX = random.nextInt(mazeWidth);
             spawnY = random.nextInt(mazeHeight);
-            goalX = random.nextInt(mazeWidth);
-            goalY = random.nextInt(mazeHeight);
-
+            goalX  = random.nextInt(mazeWidth);
+            goalY  = random.nextInt(mazeHeight);
         } while (maze[spawnY][spawnX] != 0 || maze[goalY][goalX] != 0);
 
-
-        //Generate Traps
         Set<String> trapPositions = new HashSet<>();
         while (trapMap.size() < 10) {
             int posX = random.nextInt(mazeWidth);
@@ -180,54 +203,32 @@ public class GameServer extends AbstractGameServer implements GameServerAPI {
             String key = posX + "," + posY;
 
             if (maze[posY][posX] == 0 && !trapPositions.contains(key)) {
-                Trap trap;
-
-                // Randomly select a trap type
-                int trapType = new Random().nextInt(6); // 0, 1, 2 or 3
-                switch (trapType) {
-                    case 0:
-                        trap = new RestartTrap(this, posX, posY);
-                        break;
-                    case 1:
-                        trap = new DizzyTrap(this, posX, posY);
-                        break;
-                    case 2:
-                        trap = new BlindnessTrap(this, posX, posY);
-                        break;
-                    case 3:
-                        trap = new GhostBonus(this, posX, posY);
-                        break;
-                    case 4:
-                        trap = new StatusTrap(this, posX, posY, PlayerStatusPacket.STATUS.INVISIBLE);
-                        break;
-                    case 5:
-                        trap = new StatusTrap(this, posX, posY, PlayerStatusPacket.STATUS.FROZEN);
-                        break;
-                    default:
-                        throw new IllegalStateException("Unexpected value: " + trapType);
-                }
-
+                int trapType = new Random().nextInt(6);
+                Trap trap = switch (trapType) {
+                    case 0 -> new RestartTrap(this, posX, posY);
+                    case 1 -> new DizzyTrap(this, posX, posY);
+                    case 2 -> new BlindnessTrap(this, posX, posY);
+                    case 3 -> new GhostBonus(this, posX, posY);
+                    case 4 -> new StatusTrap(this, posX, posY, PlayerStatusPacket.STATUS.INVISIBLE);
+                    case 5 -> new StatusTrap(this, posX, posY, PlayerStatusPacket.STATUS.FROZEN);
+                    default -> throw new IllegalStateException("Unexpected value: " + trapType);
+                };
                 spawnTrap(trap);
                 trapPositions.add(key);
             }
-
         }
 
-        for (ServerPlayer player : allPlayers.values()){
+        for (ServerPlayer player : allPlayers.values()) {
             player.setX(spawnX);
             player.setY(spawnY);
-            //resetPlayer status
-            for (PlayerStatusPacket.STATUS status : PlayerStatusPacket.STATUS.values()){
-                player.setStatus(status,false);
+            for (PlayerStatusPacket.STATUS status : PlayerStatusPacket.STATUS.values()) {
+                player.setStatus(status, false);
             }
         }
 
-//        for (Bot bot : bots.values()){
-//            bot.updateMaze(maze, spawnX, spawnY, goalX, goalY);
-//        }
-
-
-
+        long elapsedMs = (System.nanoTime() - start) / 1_000_000;
+        System.out.printf("[generateMap] mazeSize=%dx%d  took %d ms%n",
+                mazeWidth, mazeHeight, elapsedMs);
     }
 
     private void generateMazeUsingRecursiveBacktracking() {
@@ -306,21 +307,52 @@ public class GameServer extends AbstractGameServer implements GameServerAPI {
     private void startGame(){
         if (!matchStarted){
             matchStarted = true;
-//            for (int amount = numberOfBots; amount > 0; amount--){
-//                String botName = "bot"+amount;
-//                Bot bot = new Bot(botName);
-//                System.out.println("Adding bot :" + botName);
-//                bots.put(botName, bot);
-//            }
+
+            preventMovement = false;
             generateMap();
             broadcastMaze();
             broadcastPositionsToAll();
+            getTcpServer().broadcastPacket(new TextOverlayPacket("BEGIN!", 2000));
+            if (gameMode == GameMode.TIMER){
+                timer = new ExtendableTimer(60, ()->{
+                    var packet = new ProgressBarPacket();
+                    int progress = 0;
+                    packet.setVisible(false);
+                    packet.setProgress(progress);
+                    packet.setColor(Color.GREEN.getRGB());
+                    packet.setText("");
+                    getTcpServer().broadcastPacket(packet);
+
+                    var player = getServerPlayers().getFirst();
+
+                    var matchEndingPacket = new TextOverlayPacket("Game Over! your score is " + player.getScore(), 5000);
+                    getTcpServer().broadcastPacket(matchEndingPacket);
+                    endGame();
+                },
+                        (remainingTime->{
+                    var packet = new ProgressBarPacket();
+                    packet.setVisible(true);
+                    int progress = (int) ((remainingTime / 60.0) * 100);
+                    packet.setProgress(progress);
+                    packet.setColor(Color.GREEN.getRGB());
+                    packet.setText("Time Remaining: " + remainingTime + "s");
+                    getTcpServer().broadcastPacket(packet);
+                }));
+                timer.start();
+            }
+
+
         }
     }
 
 
     private void endGame() {
+        if (timer != null) {
+            timer.stop();
+            timer = null;
+        }
         matchStarted = false;
+        preventMovement = true;
         getTcpServer().broadcastPacket(new EndGamePacket());
     }
 

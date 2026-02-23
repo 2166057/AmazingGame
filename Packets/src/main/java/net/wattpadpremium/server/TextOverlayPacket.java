@@ -12,13 +12,12 @@ import java.io.IOException;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class PositionChangePacket implements Packet {
+public class TextOverlayPacket implements Packet {
 
-    public static final int ID = 4;
+    public static final int ID = 15;
 
-    private long playerId;
-    private int x = 0, y = 0;
-    private int color = 0;
+    private String text;
+    private int durationMS;
 
     @Override
     public int getPacketId() {
@@ -27,17 +26,13 @@ public class PositionChangePacket implements Packet {
 
     @Override
     public void readData(DataInputStream input) throws IOException {
-        playerId = input.readLong();
-        x = input.readInt();
-        y = input.readInt();
-        color = input.readInt();
+        text = input.readUTF();
+        durationMS = input.readInt();
     }
 
     @Override
     public void writeData(DataOutputStream output) throws IOException {
-        output.writeLong(playerId);
-        output.writeInt(x);
-        output.writeInt(y);
-        output.writeInt(color);
+        output.writeUTF(text);
+        output.writeInt(durationMS);
     }
 }

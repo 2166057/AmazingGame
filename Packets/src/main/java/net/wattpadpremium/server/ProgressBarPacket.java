@@ -9,35 +9,37 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-@Data
+
 @AllArgsConstructor
 @NoArgsConstructor
-public class PositionChangePacket implements Packet {
+@Data
+public class ProgressBarPacket implements Packet {
 
-    public static final int ID = 4;
+    public static final int ID = 16;
 
-    private long playerId;
-    private int x = 0, y = 0;
-    private int color = 0;
+    private String text;
+    private int progress;
+    private int color;
+    private boolean visible;
 
     @Override
     public int getPacketId() {
-        return ID;
+        return 16;
     }
 
     @Override
     public void readData(DataInputStream input) throws IOException {
-        playerId = input.readLong();
-        x = input.readInt();
-        y = input.readInt();
+        text = input.readUTF();
+        progress = input.readInt();
         color = input.readInt();
+        visible = input.readBoolean();
     }
 
     @Override
     public void writeData(DataOutputStream output) throws IOException {
-        output.writeLong(playerId);
-        output.writeInt(x);
-        output.writeInt(y);
+        output.writeUTF(text);
+        output.writeInt(progress);
         output.writeInt(color);
+        output.writeBoolean(visible);
     }
 }

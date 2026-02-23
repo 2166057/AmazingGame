@@ -1,6 +1,15 @@
 package net.wattpadpremium.amazinggame.client;
 
 import lombok.Getter;
+import net.wattpadpremium.SessionManager;
+import net.wattpadpremium.amazinggame.client.tcp.AbstractTCPClient;
+import net.wattpadpremium.amazinggame.client.tcp.SocketLessTCPClient;
+import net.wattpadpremium.amazinggame.client.tcp.TCPClient;
+import net.wattpadpremium.client.AuthSessionPacket;
+import net.wattpadpremium.server.GameServer;
+import net.wattpadpremium.server.modes.GameMode;
+import net.wattpadpremium.server.socketless.SocketLessClientHandler;
+import net.wattpadpremium.server.socketless.SocketLessTCPServer;
 
 
 import javax.sound.sampled.AudioInputStream;
@@ -8,6 +17,7 @@ import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.Clip;
 import java.awt.*;
 import java.io.File;
+import java.io.IOException;
 import java.net.URL;
 import java.util.UUID;
 
@@ -16,23 +26,23 @@ public class Game {
 
     private final GameVariables gameVariables;
 
-    private final GameMenu mainMenu;
+    private final Screen screen;
 
-    private final MultiplayerMenu multiplayerMenu;
+    private AbstractTCPClient tcpClient;
 
-    private final PlayScene playScene;
 
     public Game(GameVariables gameVariables) {
         this.gameVariables = gameVariables;
-        this.mainMenu = new GameMenu(this);
-        this.multiplayerMenu = new MultiplayerMenu(this);
-        this.playScene = new PlayScene(this);
+        this.screen = new Screen(this);
+        new ResizableDragListener(screen);
+        this.screen.setUndecorated(true);
+        this.screen.setScreenState(Screen.ScreenState.MAINMENU);
+        this.screen.setVisible(true);
 
-        mainMenu.setVisible(true);
-        //playMP3FromResources("game_song.wav");
+        playMP3FromResources("game_song.wav");
     }
 
-    static void main(String[] args) {
+    public static void main(String[] args) {
         GameVariables gameVariables = new GameVariables();
         if (args.length != 0){
             String userToken = args[0];
@@ -68,5 +78,55 @@ public class Game {
     }
 
 
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Connection helpers
+    // ─────────────────────────────────────────────────────────────────────────
 
+    public void joinSinglePlayer() {
+        try {
+            var fakeServerSocket = new SocketLessTCPServer();
+            var server           = new GameServer(GameMode.TIMER, false, fakeServerSocket);
+            var client           = new SocketLessTCPClient();
+            SocketLessClientHandler handler = client.requestSocketLessClientHandler(fakeServerSocket);
+            this.tcpClient = client;
+
+            getScreen().getPlayScene().configureClientPacketListener(this.tcpClient);
+
+            AuthSessionPacket auth = new AuthSessionPacket();
+            if (getGameVariables().getOnlineMode()) {
+                auth.setUsername(getGameVariables().getUsername());
+                auth.setSessionToken(SessionManager.createUserSessionToken(
+                        getGameVariables().getUserToken(), "-"));
+            } else {
+                auth.setUsername(getGameVariables().getUsername());
+                auth.setSessionToken(UUID.randomUUID().toString());
+            }
+           getScreen().getPlayScene().startTicking();
+            tcpClient.sendPacketToServer(auth);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void joinServer(String address, int port) {
+        try {
+            this.tcpClient = new TCPClient(address, port);
+            getScreen().getPlayScene().configureClientPacketListener(this.tcpClient);
+
+            AuthSessionPacket auth = new AuthSessionPacket();
+            if (getGameVariables().getOnlineMode()) {
+                auth.setUsername(getGameVariables().getUsername());
+                auth.setSessionToken(SessionManager.createUserSessionToken(
+                        getGameVariables().getUserToken(), "-"));
+            } else {
+                auth.setUsername(getGameVariables().getUsername());
+                auth.setSessionToken(UUID.randomUUID().toString());
+            }
+
+            getScreen().getPlayScene().startTicking();
+            tcpClient.sendPacketToServer(auth);
+        } catch (IOException | InterruptedException exception) {
+            throw new RuntimeException(exception);
+        }
+    }
 }

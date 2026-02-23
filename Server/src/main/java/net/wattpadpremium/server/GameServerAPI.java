@@ -27,4 +27,5 @@ public interface GameServerAPI {
     void removeTrap(Trap trap);
 
     void spawnTrap(Trap trap);
+
 }

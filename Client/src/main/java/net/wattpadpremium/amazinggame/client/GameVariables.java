@@ -9,6 +9,8 @@ public class GameVariables {
 
     private Boolean onlineMode;
 
+    private Boolean forceEnableMultiplayer = true;
+
     private String userToken;
 
     private String username;
