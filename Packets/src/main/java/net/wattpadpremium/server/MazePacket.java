@@ -1,50 +1,52 @@
 package net.wattpadpremium.server;
 
-import lombok.Data;
 import net.wattpadpremium.Packet;
+import net.wattpadpremium.PacketType;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-@Data
-public class MazePacket implements Packet {
+public class MazePacket extends Packet<MazePacket.Data> {
 
-    public static final int ID = 3;
+    public MazePacket(DataInputStream input) throws IOException {
+        super(input);
+    }
 
-    private int[][] maze;
-    private int goalX, goalY;
-
-    @Override
-    public int getPacketId() {
-        return ID;
+    public MazePacket(Data data) {
+        super(data);
     }
 
     @Override
-    public void readData(DataInputStream input) throws IOException {
-        int width = input.readInt();  // Read the width of the maze
-        int height = input.readInt(); // Read the height of the maze
+    protected Data readData(DataInputStream input) throws IOException {
+        int width = input.readInt();
+        int height = input.readInt();
 
-        maze = new int[height][width];
+        int[][] maze = new int[height][width];
 
-        for (int i = 0; i < height; i++) {
-            for (int j = 0; j < width; j++) {
-                maze[i][j] = input.readInt();
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                maze[y][x] = input.readInt();
             }
         }
 
-        goalX = input.readInt();
-        goalY = input.readInt();
+        int goalX = input.readInt();
+        int goalY = input.readInt();
+
+        return new Data(maze, goalX, goalY);
     }
 
     @Override
     public void writeData(DataOutputStream output) throws IOException {
-        if (maze == null) {
-            throw new IOException("Maze data is null.");
+        Data data = getData();
+        int[][] maze = data.maze();
+
+        if (maze == null || maze.length == 0 || maze[0].length == 0) {
+            throw new IOException("Maze dimensions must be valid.");
         }
 
-        int width = maze[0].length; // Number of columns
-        int height = maze.length;  // Number of rows
+        int width = maze[0].length;
+        int height = maze.length;
 
         output.writeInt(width);
         output.writeInt(height);
@@ -55,18 +57,14 @@ public class MazePacket implements Packet {
             }
         }
 
-        output.writeInt(goalX);
-        output.writeInt(goalY);
+        output.writeInt(data.goalX());
+        output.writeInt(data.goalY());
     }
 
-    public MazePacket(int[][] maze) {
-        if (maze == null || maze.length == 0 || maze[0].length == 0) {
-            throw new IllegalArgumentException("Maze dimensions must be valid.");
-        }
-        this.maze = maze;
+    @Override
+    public PacketType getPacketType() {
+        return PacketType.ServerMazePacket;
     }
 
-    // Default constructor
-    public MazePacket() {
-    }
+    public record Data(int[][] maze, int goalX, int goalY) {}
 }

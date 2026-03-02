@@ -1,38 +1,36 @@
 package net.wattpadpremium.server;
 
-import lombok.Data;
-import lombok.Getter;
 import net.wattpadpremium.Packet;
+import net.wattpadpremium.PacketType;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-@Getter
-@Data
-public class RemovePlayerPacket implements Packet {
+public class RemovePlayerPacket extends Packet<RemovePlayerPacket.Data> {
 
-    public RemovePlayerPacket(){}
+    public RemovePlayerPacket(DataInputStream inputStream) throws IOException {
+        super(inputStream);
+    }
 
-    public static final int ID = 8;
-    private long playedId;
-
-    public RemovePlayerPacket(Long playedId) {
-        this.playedId = playedId;
+    public RemovePlayerPacket(Data data) {
+        super(data);
     }
 
     @Override
-    public int getPacketId() {
-        return RemovePlayerPacket.ID;
-    }
-
-    @Override
-    public void readData(DataInputStream input) throws IOException {
-        playedId = input.readLong();
+    public Data readData(DataInputStream input) throws IOException {
+        return new Data(input.readLong());
     }
 
     @Override
     public void writeData(DataOutputStream output) throws IOException {
-        output.writeLong(playedId);
+        output.writeLong(getData().playerId());
     }
+
+    @Override
+    public PacketType getPacketType() {
+        return PacketType.ServerRemovePlayerPacket;
+    }
+
+    public record Data(long playerId) {}
 }

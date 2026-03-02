@@ -1,5 +1,6 @@
 package net.wattpadpremium;
 
+import lombok.Getter;
 import net.wattpadpremium.client.AuthSessionPacket;
 import net.wattpadpremium.client.JoinRequestPacket;
 import net.wattpadpremium.client.MovePacket;
@@ -9,70 +10,95 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-public interface Packet {
+public abstract class Packet<D> {
 
-    int getPacketId();
-    void readData(DataInputStream input) throws IOException;
-    void writeData(DataOutputStream output) throws IOException;
+    protected Packet(DataInputStream inputStream) throws IOException {
+        this.data = readData(inputStream);
+    }
 
-    static Packet createPacket(int packetId, DataInputStream payload) throws IOException {
-        Packet packet;
-        switch (packetId) {
-            case 1:
-                packet = new KeepAlivePacket();
-                packet.readData(payload);
-                return packet;
-            case 2:
-                packet = new JoinRequestPacket();
-                packet.readData(payload);
-                return packet;
-            case 3:
-                packet = new MazePacket();
-                packet.readData(payload);
-                return packet;
-            case 4:
-                packet = new PositionChangePacket();
-                packet.readData(payload);
-                return packet;
-            case 5:
-                packet = new PlayerScorePacket();
-                packet.readData(payload);
-                return packet;
-            case 6:
-                packet = new EndGamePacket();
-                packet.readData(payload);
-                return packet;
-            case 7:
-                packet = new PlayerCountPacket();
-                packet.readData(payload);
-                return packet;
-            case 8:
-                packet = new RemovePlayerPacket();
-                packet.readData(payload);
-                return packet;
-            case 9:
-                packet = new TrapPacket();
-                packet.readData(payload);
-                return packet;
-            case 11:
-                packet = new PlayerStatusPacket();
-                packet.readData(payload);
-                return packet;
-            case 12:
-                packet = new AuthSessionPacket();
-                packet.readData(payload);
-                return packet;
-            case 13:
-                packet = new AcceptConnectionPacket();
-                packet.readData(payload);
-                return packet;
-            case 14:
-                packet = new MovePacket();
-                packet.readData(payload);
-                return packet;
-            default:
-                return null;
-        }
+    protected Packet(D data) {
+        this.data = data;
+    }
+
+    @Getter
+    private final D data;
+
+    protected abstract D readData(DataInputStream input) throws IOException;
+    public abstract void writeData(DataOutputStream output) throws IOException;
+
+    public abstract PacketType getPacketType();
+
+    public static Packet<?> createPacket(DataInputStream payload) throws IOException {
+        int packetId = payload.readInt();
+        PacketType packetType = PacketType.findTypeFromId(packetId);
+        Packet<?> packet;
+        return switch (packetType) {
+            case GlobalKeepAlivePacket -> {
+                packet = new KeepAlivePacket(payload);
+                yield packet;
+            }
+            case ClientJoinRequestPacket -> {
+                packet = new JoinRequestPacket(payload);
+                yield packet;
+            }
+            case ServerMazePacket -> {
+                packet = new MazePacket(payload);
+                yield packet;
+            }
+            case ServerPositionChangePacket -> {
+                packet = new PositionChangePacket(payload);
+                yield packet;
+            }
+            case ServerPlayerScorePacket -> {
+                packet = new PlayerScorePacket(payload);
+                yield packet;
+            }
+            case ServerEndGamePacket -> {
+                packet = new EndGamePacket(payload);
+                yield packet;
+            }
+            case ServerPlayerCountPacket -> {
+                packet = new PlayerCountPacket(payload);
+                yield packet;
+            }
+            case ServerRemovePlayerPacket -> {
+                packet = new RemovePlayerPacket(payload);
+                yield packet;
+            }
+            case ServerTrapPacket -> {
+                packet = new TrapPacket(payload);
+                yield packet;
+            }
+            case ServerPlayerStatusPacket -> {
+                packet = new PlayerStatusPacket(payload);
+                yield packet;
+            }
+            case ClientAuthSessionPacket -> {
+                packet = new AuthSessionPacket(payload);
+                yield packet;
+            }
+            case ServerAcceptConnectionPacket -> {
+                packet = new AcceptConnectionPacket(payload);
+                yield packet;
+            }
+            case ClientMovePacket -> {
+                packet = new MovePacket(payload);
+                yield packet;
+            }
+            case ServerTextOverlayPacket -> {
+                packet = new TextOverlayPacket(payload);
+                yield packet;
+            }
+            case ServerProgressBarPacket -> {
+                packet = new ProgressBarPacket(payload);
+                yield packet;
+            }
+            case ServerMazeStylePacket -> {
+                packet = new MazeStylePacket(payload);
+                yield packet;
+            }
+            default -> null;
+        };
     }
 
 }

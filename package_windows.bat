@@ -11,8 +11,10 @@ jpackage ^
   --name AmazingGame ^
   --input Client/target ^
   --main-jar Client-1.0-SNAPSHOT.jar ^
+  --main-class net.wattpadpremium.amazinggame.client.Game ^
   --runtime-image runtime ^
-  --type app-image
+  --type exe ^
+  --win-console
 
 pause
 

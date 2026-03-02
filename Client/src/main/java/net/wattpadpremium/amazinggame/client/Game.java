@@ -39,7 +39,7 @@ public class Game {
         this.screen.setScreenState(Screen.ScreenState.MAINMENU);
         this.screen.setVisible(true);
 
-        playMP3FromResources("game_song.wav");
+//        playMP3FromResources("game_song.wav");
     }
 
     public static void main(String[] args) {
@@ -92,17 +92,18 @@ public class Game {
 
             getScreen().getPlayScene().configureClientPacketListener(this.tcpClient);
 
-            AuthSessionPacket auth = new AuthSessionPacket();
+            String username;
+            String sessionToken;
+
             if (getGameVariables().getOnlineMode()) {
-                auth.setUsername(getGameVariables().getUsername());
-                auth.setSessionToken(SessionManager.createUserSessionToken(
-                        getGameVariables().getUserToken(), "-"));
+                username = getGameVariables().getUsername();
+                sessionToken = SessionManager.createUserSessionToken(getGameVariables().getUserToken(), "-");
             } else {
-                auth.setUsername(getGameVariables().getUsername());
-                auth.setSessionToken(UUID.randomUUID().toString());
+                username = getGameVariables().getUsername();
+                sessionToken = UUID.randomUUID().toString();
             }
-           getScreen().getPlayScene().startTicking();
-            tcpClient.sendPacketToServer(auth);
+            getScreen().getPlayScene().startTicking();
+            tcpClient.sendPacketToServer(new AuthSessionPacket(new AuthSessionPacket.Data(username, sessionToken)));
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -113,18 +114,19 @@ public class Game {
             this.tcpClient = new TCPClient(address, port);
             getScreen().getPlayScene().configureClientPacketListener(this.tcpClient);
 
-            AuthSessionPacket auth = new AuthSessionPacket();
+            String username;
+            String sessionToken;
+
             if (getGameVariables().getOnlineMode()) {
-                auth.setUsername(getGameVariables().getUsername());
-                auth.setSessionToken(SessionManager.createUserSessionToken(
-                        getGameVariables().getUserToken(), "-"));
+                username = getGameVariables().getUsername();
+                sessionToken = SessionManager.createUserSessionToken(getGameVariables().getUserToken(), "-");
             } else {
-                auth.setUsername(getGameVariables().getUsername());
-                auth.setSessionToken(UUID.randomUUID().toString());
+                username = getGameVariables().getUsername();
+                sessionToken = UUID.randomUUID().toString();
             }
 
             getScreen().getPlayScene().startTicking();
-            tcpClient.sendPacketToServer(auth);
+            tcpClient.sendPacketToServer(new AuthSessionPacket(new AuthSessionPacket.Data(username, sessionToken)));
         } catch (IOException | InterruptedException exception) {
             throw new RuntimeException(exception);
         }

@@ -34,17 +34,17 @@ public class ServerPlayer {
     }
 
     public void setStatus(PlayerStatusPacket.STATUS status, boolean enabled){
-        PlayerStatusPacket playerStatusPacket = new PlayerStatusPacket(getPlayerId(), status, enabled);
+        PlayerStatusPacket playerStatusPacket = new PlayerStatusPacket(new PlayerStatusPacket.Data(getPlayerId(), status, enabled));
         sendPacketToClient(playerStatusPacket);
     }
 
     public void setScore(int score){
         this.score = score;
-        PlayerScorePacket playerScorePacket = new PlayerScorePacket(getPlayerId(), score);
+        PlayerScorePacket playerScorePacket = new PlayerScorePacket(new PlayerScorePacket.Data(getPlayerId(), score));
         gameServer.getTcpServer().broadcastPacket(playerScorePacket);
     }
 
-    public void sendPacketToClient(Packet packet){
+    public void sendPacketToClient(Packet<?> packet){
         clientHandler.sendPacketToClient(packet);
     }
 

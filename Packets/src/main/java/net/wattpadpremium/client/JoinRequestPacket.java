@@ -1,33 +1,39 @@
 package net.wattpadpremium.client;
 
-import lombok.Getter;
-import lombok.Setter;
 import net.wattpadpremium.Packet;
+import net.wattpadpremium.PacketType;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-@Setter
-@Getter
-public class JoinRequestPacket implements Packet {
 
-    public static final int ID = 2;
+public class JoinRequestPacket extends Packet<JoinRequestPacket.Data> {
 
-    private int color;
 
-    @Override
-    public int getPacketId() {
-        return ID;
+    public JoinRequestPacket(DataInputStream inputStream) throws IOException {
+        super(inputStream);
+    }
+
+    public JoinRequestPacket(Data data) {
+        super(data);
     }
 
     @Override
-    public void readData(DataInputStream input) throws IOException {
-        this.color = input.readInt();
+    public JoinRequestPacket.Data readData(DataInputStream input) throws IOException {
+        return new Data(input.readInt());
     }
 
     @Override
     public void writeData(DataOutputStream output) throws IOException {
-        output.writeInt(color);
+        output.writeInt(getData().color);
     }
+
+    @Override
+    public PacketType getPacketType() {
+        return PacketType.ClientJoinRequestPacket;
+    }
+
+
+    public record Data(int color){}
 }

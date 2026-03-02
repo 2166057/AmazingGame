@@ -2,6 +2,7 @@ package net.wattpadpremium.amazinggame.client;
 
 import lombok.Getter;
 import lombok.Setter;
+import net.wattpadpremium.PacketType;
 import net.wattpadpremium.amazinggame.client.playscene.components.ScoreboardComponent;
 import net.wattpadpremium.amazinggame.client.tcp.AbstractTCPClient;
 import net.wattpadpremium.client.MovePacket;
@@ -12,13 +13,10 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
 import java.io.IOException;
 import java.util.Timer;
 import java.util.*;
 
-import static com.sun.java.accessibility.util.AWTEventMonitor.addWindowListener;
 import static net.wattpadpremium.amazinggame.client.playscene.components.KeyStrokesComponent.drawKeybindPanel;
 
 public class PlayScene extends JPanel {
@@ -34,6 +32,7 @@ public class PlayScene extends JPanel {
     private int goalX = 0, goalY = 0;
     private int mazeSize = 15;
     private int[][] maze;
+    private Color wallColor = Color.BLACK;
 
     private int viewPortX = 0;
     private int viewPortY = 0;
@@ -159,8 +158,8 @@ public class PlayScene extends JPanel {
 
     @Override
     public void paintComponent(Graphics g) {
-        Image    buf = createImage(getWidth(), getHeight());
-        Graphics og  = buf.getGraphics();
+        Image buf = createImage(getWidth(), getHeight());
+        Graphics og = buf.getGraphics();
 
         og.setColor(new Color(30, 30, 35));
         og.fillRect(0, 0, getWidth(), getHeight());
@@ -168,27 +167,28 @@ public class PlayScene extends JPanel {
         drawKeybindPanel(og, this);
 
         // Status indicators drawn to og (the buffer), not g
-        int panelW    = leftPanelWidth();
-        int panelH    = getHeight();
-        int keySize   = Math.max(24, Math.min(panelW / 5, 48));
-        int gap       = Math.max(4, keySize / 5);
+        int panelW = leftPanelWidth();
+        int panelH = getHeight();
+        int keySize = Math.max(24, Math.min(panelW / 5, 48));
+        int gap = Math.max(4, keySize / 5);
         int clusterCY = panelH / 2;
         drawStatusIndicators(og, panelW, 60, clusterCY - (keySize + gap) - gap * 4);
 
         int cellSize = computeCellSize();
-        int visX     = visibleCellsX(cellSize);
-        int visY     = visibleCellsY(cellSize);
-        int originX  = mazeOriginX(cellSize);
-        int originY  = mazeOriginY(cellSize);
+        int visX = visibleCellsX(cellSize);
+        int visY = visibleCellsY(cellSize);
+        int originX = mazeOriginX(cellSize);
+        int originY = mazeOriginY(cellSize);
 
         updateViewport(cellSize);
 
         if (maze != null) {
-            boolean isBlinded  = isStatusActive(PlayerStatusPacket.STATUS.BLINDED);
+            boolean isBlinded = isStatusActive(PlayerStatusPacket.STATUS.BLINDED);
             boolean isGhosting = isStatusActive(PlayerStatusPacket.STATUS.GHOSTING);
-            Color normalColor  = isBlinded ? Color.BLACK : getBackground();
-            Color wallColor    = (isGhosting && !isBlinded) ? Color.DARK_GRAY : Color.BLACK;
+            Color normalColor = isBlinded ? this.wallColor : getBackground();
+            Color wallColor = (isGhosting && !isBlinded) ? new Color(this.wallColor.getRed(), this.wallColor.getGreen(), this.wallColor.getBlue(), 20) : this.wallColor;
 
+            // Draw maze
             for (int dy = 0; dy < visY; dy++) {
                 for (int dx = 0; dx < visX; dx++) {
                     int cellX = viewPortX + dx;
@@ -201,41 +201,65 @@ public class PlayScene extends JPanel {
                 }
             }
 
+            // Draw other players with outline
             for (Player p : otherPlayers.values()) {
                 int relX = p.getX() - viewPortX, relY = p.getY() - viewPortY;
                 if (relX >= 0 && relX < visX && relY >= 0 && relY < visY) {
-                    og.setColor(p.getColor());
-                    og.fillOval(originX + relX * cellSize, originY + relY * cellSize, cellSize, cellSize);
-                }
-            }
+                    int px = originX + relX * cellSize;
+                    int py = originY + relY * cellSize;
 
-            boolean invisible = isStatusActive(PlayerStatusPacket.STATUS.INVISIBLE);
-            boolean frozen    = isStatusActive(PlayerStatusPacket.STATUS.FROZEN);
-            int relLX = localPosX - viewPortX, relLY = localPosY - viewPortY;
-            if (relLX >= 0 && relLX < visX && relLY >= 0 && relLY < visY) {
-                int px = originX + relLX * cellSize, py = originY + relLY * cellSize;
-                if (frozen) { og.setColor(Color.WHITE); og.fillOval(px - 5, py - 5, cellSize + 10, cellSize + 10); }
-                if (!invisible) {
-                    og.setColor(frozen ? new Color(173, 216, 230) : localPlayer.getColor());
+                    // Outline
+                    og.setColor(Color.WHITE);
+                    og.fillOval(px - 2, py - 2, cellSize + 4, cellSize + 4);
+
+                    // Player
+                    og.setColor(p.getColor());
                     og.fillOval(px, py, cellSize, cellSize);
                 }
             }
 
+            // Draw local player with outline
+            boolean invisible = isStatusActive(PlayerStatusPacket.STATUS.INVISIBLE);
+            boolean frozen = isStatusActive(PlayerStatusPacket.STATUS.FROZEN);
+            int relLX = localPosX - viewPortX, relLY = localPosY - viewPortY;
+            if (relLX >= 0 && relLX < visX && relLY >= 0 && relLY < visY && !invisible) {
+                int px = originX + relLX * cellSize, py = originY + relLY * cellSize;
+
+                // Optional: frozen effect
+                if (frozen) {
+                    og.setColor(new Color(173, 216, 230));
+                    og.fillOval(px - 2, py - 2, cellSize + 4, cellSize + 4);
+                }
+
+                // Outline
+                og.setColor(Color.WHITE);
+                og.fillOval(px - 2, py - 2, cellSize + 4, cellSize + 4);
+
+                // Player
+                og.setColor(frozen ? new Color(173, 216, 230) : localPlayer.getColor());
+                og.fillOval(px, py, cellSize, cellSize);
+            }
+
+            // Draw drawables
             for (ClientObject obj : drawables.values()) {
                 int relX = obj.x - viewPortX, relY = obj.y - viewPortY;
                 if (relX >= 0 && relX < visX && relY >= 0 && relY < visY) {
                     og.setColor(obj.color);
-                    int px = originX + relX * cellSize, py = originY + relY * cellSize;
-                    og.fillRoundRect(px, py, cellSize, cellSize, cellSize / 4, cellSize / 4);
+                    int px = originX + relX * cellSize + cellSize / 4;
+                    int py = originY + relY * cellSize + cellSize / 4;
+                    int size = cellSize / 2;
+                    og.fillRoundRect(px, py, size, size, size / 4, size / 4);
                 }
             }
 
+            // Draw goal
             int relGX = goalX - viewPortX, relGY = goalY - viewPortY;
             if (relGX >= 0 && relGX < visX && relGY >= 0 && relGY < visY)
                 og.drawImage(goalImage, originX + relGX * cellSize, originY + relGY * cellSize,
                         cellSize, cellSize, null);
 
         } else {
+            // Maze not loaded
             og.setColor(Color.WHITE);
             String msg = "Loading Terrain...";
             FontMetrics fm = og.getFontMetrics();
@@ -245,9 +269,10 @@ public class PlayScene extends JPanel {
         }
 
         // ── Overlays drawn last so they sit on top of everything ──────────
-        if (progressBarVisible)  drawProgressBar(og);
-        if (hasActiveOverlay())  drawTextOverlay(og);
-        if (keyState[4]) ScoreboardComponent.drawScoreboard(og, otherPlayers, localPlayer, score, getWidth(), getHeight());
+        if (progressBarVisible) drawProgressBar(og);
+        if (hasActiveOverlay()) drawTextOverlay(og);
+        if (keyState[4])
+            ScoreboardComponent.drawScoreboard(og, otherPlayers, localPlayer, score, getWidth(), getHeight());
 
         g.drawImage(buf, 0, 0, this);
     }
@@ -461,10 +486,10 @@ public class PlayScene extends JPanel {
     }
 
     public void updateMaze(MazePacket mazePacket) {
-        this.maze     = mazePacket.getMaze();
-        this.mazeSize = mazePacket.getMaze().length;
-        this.goalX    = mazePacket.getGoalX();
-        this.goalY    = mazePacket.getGoalY();
+        this.maze     = mazePacket.getData().maze();
+        this.mazeSize = mazePacket.getData().maze().length;
+        this.goalX    = mazePacket.getData().goalX();
+        this.goalY    = mazePacket.getData().goalY();
     }
 
     public void changeSpecificPlayerScore(long playerId, int score) {
@@ -503,9 +528,7 @@ public class PlayScene extends JPanel {
     }
 
     private void sendPositionChanges() {
-        MovePacket packet = new MovePacket();
-        packet.setX(localPosX);
-        packet.setY(localPosY);
+        MovePacket packet = new MovePacket(new MovePacket.Data(localPosX, localPosY));
         instance.getTcpClient().sendPacketToServer(packet);
     }
 
@@ -563,62 +586,67 @@ public class PlayScene extends JPanel {
 
 
     public void configureClientPacketListener(AbstractTCPClient client) {
-        client.getPacketHandler().put(AcceptConnectionPacket.ID, packet -> {
+        client.getPacketHandler().put(PacketType.ServerMazeStylePacket, packet -> {
+            MazeStylePacket.Data packetData = (MazeStylePacket.Data) packet.getData();
+            wallColor = new Color(packetData.wallColor());
+            setBackground(new Color(packetData.groundColor()));
+        });
 
-            AcceptConnectionPacket p = (AcceptConnectionPacket) packet;
+
+        client.getPacketHandler().put(PacketType.ServerAcceptConnectionPacket, packet -> {
+            AcceptConnectionPacket.Data packetData = (AcceptConnectionPacket.Data) packet.getData();
             localPlayer = new Player();
-            localPlayer.setUsername(p.getUsername());
-            localPlayer.setPlayerId(p.getPlayerId());
+            localPlayer.setUsername(packetData.username());
+            localPlayer.setPlayerId(packetData.playerId());
             localPlayer.setColor(instance.getGameVariables().getSelectedColor());
             instance.getScreen().setScreenState(Screen.ScreenState.GAMEPLAY);
         });
 
         // ── ProgressBarPacket
-        client.getPacketHandler().put(ProgressBarPacket.ID, packet -> {
-            ProgressBarPacket p = (ProgressBarPacket) packet;
-            progressBarVisible = p.isVisible();
-            progressBarText    = p.getText();
-            progressBarColor   = new Color(p.getColor());
-            progressBarValue   = p.getProgress(); // 0–100
+        client.getPacketHandler().put(PacketType.ServerProgressBarPacket, packet -> {
+            ProgressBarPacket.Data packetData = (ProgressBarPacket.Data) packet.getData();
+            progressBarVisible = packetData.visible();
+            progressBarText    = packetData.text();
+            progressBarColor   = new Color(packetData.color());
+            progressBarValue   = packetData.progress(); // 0–100
         });
 
-        client.getPacketHandler().put(MazePacket.ID, packet ->
+        client.getPacketHandler().put(PacketType.ServerMazePacket, packet ->
                 updateMaze((MazePacket) packet));
-        client.getPacketHandler().put(PositionChangePacket.ID, packet -> {
-            PositionChangePacket p = (PositionChangePacket) packet;
-            System.out.println("Received position changed " + p);
-            if (p.getPlayerId() == localPlayer.getPlayerId()) {
-                setLocalePosition(p.getX(), p.getY());
+        client.getPacketHandler().put(PacketType.ServerPositionChangePacket, packet -> {
+            PositionChangePacket.Data packetData = (PositionChangePacket.Data) packet.getData();
+            System.out.println("Received position changed " + packetData);
+            if (packetData.playerId() == localPlayer.getPlayerId()) {
+                setLocalePosition(packetData.x(), packetData.y());
             } else {
-                setSpecificPlayerPos(p.getPlayerId(), p.getX(), p.getY());
-                changeSpecificPlayerColor(p.getPlayerId(), p.getColor());
+                setSpecificPlayerPos(packetData.playerId(), packetData.x(), packetData.y());
+                changeSpecificPlayerColor(packetData.playerId(), packetData.color());
             }
         });
-        client.getPacketHandler().put(RemovePlayerPacket.ID, packet ->
-                removePlayer(((RemovePlayerPacket) packet).getPlayedId()));
-        client.getPacketHandler().put(PlayerScorePacket.ID, packet -> {
-            PlayerScorePacket p = (PlayerScorePacket) packet;
-            if (p.getPlayerId() == localPlayer.getPlayerId()) setMyScore(p.getScore());
-            else changeSpecificPlayerScore(p.getPlayerId(), p.getScore());
+        client.getPacketHandler().put(PacketType.ServerRemovePlayerPacket, packet ->
+                removePlayer(((RemovePlayerPacket.Data) packet.getData()).playerId()));
+        client.getPacketHandler().put(PacketType.ServerPlayerScorePacket, packet -> {
+            PlayerScorePacket.Data p = (PlayerScorePacket.Data) packet.getData();
+            if (p.playerId() == localPlayer.getPlayerId()) setMyScore(p.score());
+            else changeSpecificPlayerScore(p.playerId(), p.score());
         });
-        client.getPacketHandler().put(EndGamePacket.ID, packet -> { });
-        client.getPacketHandler().put(TextOverlayPacket.ID, packet -> {
-            TextOverlayPacket p = (TextOverlayPacket) packet;
-            System.out.println("[TextOverlay] text=" + p.getText() + " duration=" + p.getDurationMS());
-            showOverlay(p.getText(), p.getDurationMS());
+        client.getPacketHandler().put(PacketType.ServerEndGamePacket, packet -> { });
+        client.getPacketHandler().put(PacketType.ServerTextOverlayPacket, packet -> {
+            TextOverlayPacket.Data p = (TextOverlayPacket.Data) packet.getData();
+            showOverlay(p.text(), p.durationMS());
         });
-        client.getPacketHandler().put(PlayerCountPacket.ID, packet -> { /* unused */ });
-        client.getPacketHandler().put(TrapPacket.ID, packet -> {
-            TrapPacket p   = (TrapPacket) packet;
-            UUID uid = UUID.fromString(p.getTrapID());
-            if (p.isDelete()) removeDrawable(uid);
+        client.getPacketHandler().put(PacketType.ServerPlayerCountPacket, packet -> { /* unused */ });
+        client.getPacketHandler().put(PacketType.ServerTrapPacket, packet -> {
+            TrapPacket.Data p   = (TrapPacket.Data) packet.getData();
+            UUID uid = UUID.fromString(p.trapID());
+            if (p.delete()) removeDrawable(uid);
             else addDrawable(new ClientObject(
-                    p.getPosX(), p.getPosY(), new Color(p.getColor()), uid));
+                    p.posX(), p.posY(), new Color(p.color()), uid));
         });
-        client.getPacketHandler().put(PlayerStatusPacket.ID, packet -> {
-            PlayerStatusPacket p = (PlayerStatusPacket) packet;
-            if (localPlayer.getPlayerId() == p.getPlayerId())
-                setLocalePlayerStatus(p.getStatus(), p.isEnabled());
+        client.getPacketHandler().put(PacketType.ServerPlayerStatusPacket, packet -> {
+            PlayerStatusPacket.Data p = (PlayerStatusPacket.Data) packet.getData();
+            if (localPlayer.getPlayerId() == p.playerId())
+                setLocalePlayerStatus(p.status(), p.enabled());
         });
     }
 }

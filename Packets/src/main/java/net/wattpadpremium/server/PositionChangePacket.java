@@ -1,43 +1,47 @@
 package net.wattpadpremium.server;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import net.wattpadpremium.Packet;
+import net.wattpadpremium.PacketType;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-@Data
-@AllArgsConstructor
-@NoArgsConstructor
-public class PositionChangePacket implements Packet {
+public class PositionChangePacket extends Packet<PositionChangePacket.Data> {
 
-    public static final int ID = 4;
 
-    private long playerId;
-    private int x = 0, y = 0;
-    private int color = 0;
+    public PositionChangePacket(DataInputStream inputStream) throws IOException {
+        super(inputStream);
+    }
 
-    @Override
-    public int getPacketId() {
-        return ID;
+    public PositionChangePacket(Data data) {
+        super(data);
     }
 
     @Override
-    public void readData(DataInputStream input) throws IOException {
-        playerId = input.readLong();
-        x = input.readInt();
-        y = input.readInt();
-        color = input.readInt();
+    protected Data readData(DataInputStream input) throws IOException {
+        long playerId = input.readLong();
+        int x = input.readInt();
+        int y = input.readInt();
+        int color = input.readInt();
+
+        return new Data(playerId, x, y, color);
     }
 
     @Override
     public void writeData(DataOutputStream output) throws IOException {
-        output.writeLong(playerId);
-        output.writeInt(x);
-        output.writeInt(y);
-        output.writeInt(color);
+        Data data = getData();
+
+        output.writeLong(data.playerId());
+        output.writeInt(data.x());
+        output.writeInt(data.y());
+        output.writeInt(data.color());
     }
+
+    @Override
+    public PacketType getPacketType() {
+        return PacketType.ServerPositionChangePacket;
+    }
+
+    public record Data(long playerId, int x, int y, int color) {}
 }

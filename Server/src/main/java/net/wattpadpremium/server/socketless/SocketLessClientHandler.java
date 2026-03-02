@@ -20,15 +20,15 @@ public class SocketLessClientHandler implements IClientHandler {
 
     private final SocketLessTCPServer socketLessTCPServer;
 
-    private Consumer<Packet> receivePacketConsumer;
+    private Consumer<Packet<?>> receivePacketConsumer;
 
     @Override
-    public void sendPacketToClient(Packet packet) {
-        System.out.println(this.getClass().getName()+ " is sending Packet "+ packet.getPacketId() +" to this client" + serverPlayer.getPlayerId());
+    public void sendPacketToClient(Packet<?> packet) {
+        System.out.println(this.getClass().getName()+ " is sending Packet "+ packet.getPacketType() +" to this client" + serverPlayer.getPlayerId());
         receivePacketConsumer.accept(packet);
     }
 
-    public void onSendPacketToClient(Consumer<Packet> packetConsumer) {
+    public void onSendPacketToClient(Consumer<Packet<?>> packetConsumer) {
         this.receivePacketConsumer = packetConsumer;
     }
 }

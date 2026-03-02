@@ -1,28 +1,37 @@
 package net.wattpadpremium.server;
 
 import net.wattpadpremium.Packet;
+import net.wattpadpremium.PacketType;
 
+import javax.lang.model.type.NullType;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-public class EndGamePacket implements Packet {
+public class EndGamePacket extends Packet<Void> {
 
-    public static final int ID = 6;
 
-    @Override
-    public int getPacketId() {
-        return ID;
+    public EndGamePacket(DataInputStream inputStream) throws IOException {
+        super(inputStream);
+    }
+
+    public EndGamePacket() {
+        super((Void) null);
     }
 
     @Override
-    public void readData(DataInputStream input) throws IOException {
-
+    public Void readData(DataInputStream input) throws IOException {
+        return null;
     }
 
     @Override
     public void writeData(DataOutputStream output) throws IOException {
 
+    }
+
+    @Override
+    public PacketType getPacketType() {
+        return PacketType.ServerEndGamePacket;
     }
 
 }

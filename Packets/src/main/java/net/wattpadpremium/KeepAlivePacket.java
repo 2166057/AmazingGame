@@ -2,29 +2,37 @@ package net.wattpadpremium;
 
 import lombok.Getter;
 
+import javax.lang.model.type.NullType;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
 
 @Getter
-public class KeepAlivePacket implements Packet {
+public class KeepAlivePacket extends Packet<NullType> {
 
-    public static final int ID = 1;
+    protected KeepAlivePacket(DataInputStream inputStream) throws IOException {
+        super(inputStream);
+    }
 
-    @Override
-    public int getPacketId() {
-        return ID;
+    protected KeepAlivePacket(NullType data) {
+        super(data);
     }
 
     @Override
-    public void readData(DataInputStream input) throws IOException {
-
+    protected NullType readData(DataInputStream input) throws IOException {
+        return null;
     }
 
     @Override
     public void writeData(DataOutputStream output) throws IOException {
 
     }
+
+    @Override
+    public PacketType getPacketType() {
+        return PacketType.GlobalKeepAlivePacket;
+    }
+
 
 }

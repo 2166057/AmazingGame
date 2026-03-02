@@ -1,35 +1,40 @@
 package net.wattpadpremium.server;
 
-import lombok.Data;
 import net.wattpadpremium.Packet;
+import net.wattpadpremium.PacketType;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-@Data
-public class PlayerCountPacket implements Packet {
+public class PlayerCountPacket extends Packet<PlayerCountPacket.Data> {
 
-    public static final int ID = 7;
+    public PlayerCountPacket(DataInputStream inputStream) throws IOException {
+        super(inputStream);
+    }
 
-    private int count = 0;
-    private int max = 0;
-
-    @Override
-    public int getPacketId() {
-        return ID;
+    public PlayerCountPacket(Data data) {
+        super(data);
     }
 
     @Override
-    public void readData(DataInputStream input) throws IOException {
-        count = input.readInt();
-        max = input.readInt();
+    public Data readData(DataInputStream input) throws IOException {
+        return new Data(
+                input.readInt(),
+                input.readInt()
+        );
     }
 
     @Override
     public void writeData(DataOutputStream output) throws IOException {
-        output.writeInt(count);
-        output.writeInt(max);
+        output.writeInt(getData().count());
+        output.writeInt(getData().max());
     }
 
+    @Override
+    public PacketType getPacketType() {
+        return PacketType.ServerPlayerCountPacket;
+    }
+
+    public record Data(int count, int max) {}
 }

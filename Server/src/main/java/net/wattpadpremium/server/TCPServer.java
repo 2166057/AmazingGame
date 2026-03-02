@@ -1,9 +1,8 @@
 package net.wattpadpremium.server;
 
 import lombok.Getter;
-import lombok.Setter;
-import net.wattpadpremium.Packet;
-import net.wattpadpremium.server.handler.ServerPacketHandler;
+import net.wattpadpremium.PacketType;
+import net.wattpadpremium.server.handler.ServerPacketListener;
 
 import java.io.*;
 import java.net.*;
@@ -18,12 +17,12 @@ public class TCPServer extends AbstractTCPServer{
     private final List<ClientHandler> clientHandlers = new ArrayList<>();
 
     @Getter
-    private final ServerPacketHandler serverPacketHandler;
+    private final HashMap<PacketType, ServerPacketListener> serverPacketHandler;
 
     public TCPServer(int port) throws IOException {
         this.serverPort = port;
         serverSocket = new ServerSocket(serverPort);
-        serverPacketHandler = new ServerPacketHandler();
+        serverPacketHandler = new HashMap<>();
     }
 
     public void startServer() {

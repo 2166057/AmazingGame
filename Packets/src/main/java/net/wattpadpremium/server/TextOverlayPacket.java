@@ -1,38 +1,41 @@
 package net.wattpadpremium.server;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import net.wattpadpremium.Packet;
+import net.wattpadpremium.PacketType;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-@Data
-@AllArgsConstructor
-@NoArgsConstructor
-public class TextOverlayPacket implements Packet {
+public class TextOverlayPacket extends Packet<TextOverlayPacket.Data> {
 
-    public static final int ID = 15;
+    public TextOverlayPacket(DataInputStream inputStream) throws IOException {
+        super(inputStream);
+    }
 
-    private String text;
-    private int durationMS;
-
-    @Override
-    public int getPacketId() {
-        return ID;
+    public TextOverlayPacket(Data data) {
+        super(data);
     }
 
     @Override
-    public void readData(DataInputStream input) throws IOException {
-        text = input.readUTF();
-        durationMS = input.readInt();
+    public Data readData(DataInputStream input) throws IOException {
+        return new Data(
+                input.readUTF(),
+                input.readInt()
+        );
     }
 
     @Override
     public void writeData(DataOutputStream output) throws IOException {
-        output.writeUTF(text);
-        output.writeInt(durationMS);
+        output.writeUTF(getData().text());
+        output.writeInt(getData().durationMS());
     }
+
+    @Override
+    public PacketType getPacketType() {
+        return PacketType.ServerTextOverlayPacket;
+    }
+
+    public record Data(@NotNull String text, int durationMS) {}
 }

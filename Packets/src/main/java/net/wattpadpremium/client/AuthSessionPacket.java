@@ -1,35 +1,39 @@
 package net.wattpadpremium.client;
 
-import lombok.Data;
 import net.wattpadpremium.Packet;
+import net.wattpadpremium.PacketType;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-@Data
-public class AuthSessionPacket implements Packet {
-
-    public static final int ID = 12;
-
-    private String sessionToken;
-    private String username = "";
+public class AuthSessionPacket extends Packet<AuthSessionPacket.Data> {
 
 
-    @Override
-    public int getPacketId() {
-        return ID;
+    public AuthSessionPacket(DataInputStream inputStream) throws IOException {
+        super(inputStream);
+    }
+
+    public AuthSessionPacket(Data data) {
+        super(data);
     }
 
     @Override
-    public void readData(DataInputStream input) throws IOException {
-        sessionToken = input.readUTF();
-        username = input.readUTF();
+    public Data readData(DataInputStream input) throws IOException {
+        return new Data(input.readUTF(), input.readUTF());
     }
 
     @Override
     public void writeData(DataOutputStream output) throws IOException {
-        output.writeUTF(sessionToken);
-        output.writeUTF(username);
+        output.writeUTF(getData().sessionToken);
+        output.writeUTF(getData().username);
     }
+
+    @Override
+    public PacketType getPacketType() {
+        return PacketType.ClientAuthSessionPacket;
+    }
+
+    public record Data(String sessionToken, String username){}
+
 }

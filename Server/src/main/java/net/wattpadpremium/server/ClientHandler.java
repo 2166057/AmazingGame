@@ -3,6 +3,7 @@ package net.wattpadpremium.server;
 import lombok.Getter;
 import lombok.Setter;
 import net.wattpadpremium.Packet;
+import net.wattpadpremium.PacketType;
 
 
 import java.io.DataInputStream;
@@ -29,11 +30,11 @@ public class ClientHandler implements IClientHandler, Runnable {
             DataInputStream in = new DataInputStream(clientSocket.getInputStream());
             while (true) {
                 try {
-                    var packet = tcpServer.getServerPacketHandler().readPacket(in);
-                    if (packet != null && tcpServer.getServerPacketHandler().containsKey(packet.getPacketId())) {
+                    var packet = Packet.createPacket(in);
+                    if (packet != null && tcpServer.getServerPacketHandler().containsKey(packet.getPacketType())) {
                         tcpServer.receivePacket(packet, this);
                     } else {
-                        System.err.println("Unknown packet ID: " + packet.getPacketId());
+                        System.err.println("Unknown packet ID: " + packet.getPacketType());
                     }
                 } catch (IOException e) {
                     System.err.println("Error reading packet: " + e.getMessage());
@@ -57,12 +58,12 @@ public class ClientHandler implements IClientHandler, Runnable {
     }
 
     @Override
-    public void sendPacketToClient(Packet packet) {
+    public void sendPacketToClient(Packet<?> packet) {
         try {
             DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream());
-            out.writeInt(packet.getPacketId());
+            out.writeInt(PacketType.findIdFromType(packet.getPacketType()));
             packet.writeData(out);
-//                System.out.println("Sending Packet: " + packet);
+            //System.out.println("Sending Packet: " + packet);
             out.flush();
         } catch (IOException e) {
             System.err.println("Error sending packet: " + e.getMessage());

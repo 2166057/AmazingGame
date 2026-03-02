@@ -1,45 +1,44 @@
 package net.wattpadpremium.server;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import net.wattpadpremium.Packet;
+import net.wattpadpremium.PacketType;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
+public class ProgressBarPacket extends Packet<ProgressBarPacket.Data> {
 
-@AllArgsConstructor
-@NoArgsConstructor
-@Data
-public class ProgressBarPacket implements Packet {
+    public ProgressBarPacket(DataInputStream inputStream) throws IOException {
+        super(inputStream);
+    }
 
-    public static final int ID = 16;
-
-    private String text;
-    private int progress;
-    private int color;
-    private boolean visible;
-
-    @Override
-    public int getPacketId() {
-        return 16;
+    public ProgressBarPacket(Data data) {
+        super(data);
     }
 
     @Override
-    public void readData(DataInputStream input) throws IOException {
-        text = input.readUTF();
-        progress = input.readInt();
-        color = input.readInt();
-        visible = input.readBoolean();
+    public Data readData(DataInputStream input) throws IOException {
+        return new Data(
+                input.readUTF(),
+                input.readInt(),
+                input.readInt(),
+                input.readBoolean()
+        );
     }
 
     @Override
     public void writeData(DataOutputStream output) throws IOException {
-        output.writeUTF(text);
-        output.writeInt(progress);
-        output.writeInt(color);
-        output.writeBoolean(visible);
+        output.writeUTF(getData().text());
+        output.writeInt(getData().progress());
+        output.writeInt(getData().color());
+        output.writeBoolean(getData().visible());
     }
+
+    @Override
+    public PacketType getPacketType() {
+        return PacketType.ServerProgressBarPacket;
+    }
+
+    public record Data(String text, int progress, int color, boolean visible) {}
 }

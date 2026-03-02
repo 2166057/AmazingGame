@@ -1,47 +1,52 @@
 package net.wattpadpremium.server;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import net.wattpadpremium.Packet;
+import net.wattpadpremium.PacketType;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
+public class TrapPacket extends Packet<TrapPacket.Data> {
 
-@NoArgsConstructor
-@AllArgsConstructor
-@Data
-public class TrapPacket implements Packet {
+    public TrapPacket(DataInputStream inputStream) throws IOException {
+        super(inputStream);
+    }
 
-    public static final int ID = 9;
-
-    private String trapID;
-    private int posX, posY;
-    private int color;
-    private boolean delete;
-
-    @Override
-    public int getPacketId() {
-        return ID;
+    public TrapPacket(Data data) {
+        super(data);
     }
 
     @Override
-    public void readData(DataInputStream input) throws IOException {
-        trapID = input.readUTF();
-        posX = input.readInt();
-        posY = input.readInt();
-        color = input.readInt();
-        delete = input.readBoolean();
+    public Data readData(DataInputStream input) throws IOException {
+        return new Data(
+                input.readUTF(),
+                input.readInt(),
+                input.readInt(),
+                input.readInt(),
+                input.readBoolean()
+        );
     }
 
     @Override
     public void writeData(DataOutputStream output) throws IOException {
-        output.writeUTF(trapID);
-        output.writeInt(posX);
-        output.writeInt(posY);
-        output.writeInt(color);
-        output.writeBoolean(delete);
+        output.writeUTF(getData().trapID());
+        output.writeInt(getData().posX());
+        output.writeInt(getData().posY());
+        output.writeInt(getData().color());
+        output.writeBoolean(getData().delete());
     }
+
+    @Override
+    public PacketType getPacketType() {
+        return PacketType.ServerTrapPacket;
+    }
+
+    public record Data(
+            String trapID,
+            int posX,
+            int posY,
+            int color,
+            boolean delete
+    ) {}
 }
